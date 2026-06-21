@@ -1,0 +1,7 @@
+{
+  "name": "smarttok-web",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "SmartTok web — a modular, multi-source discovery feed with a Vercel CORS proxy for sources that need it."
+}
