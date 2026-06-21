@@ -17,10 +17,17 @@ const NasaAdapter = {
     return Promise.all(requests);
   },
 
+  API_KEY_STORAGE_KEY: "smarttok.nasaApiKey",
+
+  _getApiKey() {
+    return localStorage.getItem(this.API_KEY_STORAGE_KEY) || "DEMO_KEY";
+  },
+
   async _fetchOne() {
     try {
+      const key = this._getApiKey();
       const res = await fetch(
-        `https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&count=1`
+        `https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(key)}&count=1`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const [item] = await res.json();

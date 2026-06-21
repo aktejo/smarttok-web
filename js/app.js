@@ -274,10 +274,57 @@
       if (adapter.sourceKey === "arxiv" && isOn) {
         settingsListEl.appendChild(_renderArxivTopics());
       }
+      if (adapter.sourceKey === "nasa" && isOn) {
+        settingsListEl.appendChild(_renderNasaApiKey());
+      }
     }
     const clearBtn = document.getElementById("clear-history-btn");
     clearBtn.textContent = `Clear history (${history.entries.length} card${history.entries.length === 1 ? "" : "s"})`;
     clearBtn.disabled = history.entries.length === 0;
+  }
+
+  function _renderNasaApiKey() {
+    const section = document.createElement("div");
+    section.className = "arxiv-topics";
+
+    const heading = document.createElement("div");
+    heading.className = "arxiv-topics-heading";
+    heading.textContent = "NASA API key";
+    section.appendChild(heading);
+
+    const note = document.createElement("p");
+    note.className = "nasa-api-note";
+    note.innerHTML = `Free key at <a href="https://api.nasa.gov/" target="_blank" rel="noopener">api.nasa.gov</a> — avoids the shared rate limit.`;
+    section.appendChild(note);
+
+    const inputRow = document.createElement("div");
+    inputRow.className = "nasa-api-row";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "nasa-api-input";
+    input.placeholder = "Paste key here (or leave blank for DEMO_KEY)";
+    input.value = localStorage.getItem(NasaAdapter.API_KEY_STORAGE_KEY) || "";
+    input.setAttribute("aria-label", "NASA API key");
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "nasa-api-save";
+    saveBtn.textContent = "Save";
+    saveBtn.addEventListener("click", () => {
+      const val = input.value.trim();
+      if (val) {
+        localStorage.setItem(NasaAdapter.API_KEY_STORAGE_KEY, val);
+      } else {
+        localStorage.removeItem(NasaAdapter.API_KEY_STORAGE_KEY);
+      }
+      saveBtn.textContent = "Saved!";
+      setTimeout(() => { saveBtn.textContent = "Save"; }, 1500);
+    });
+
+    inputRow.appendChild(input);
+    inputRow.appendChild(saveBtn);
+    section.appendChild(inputRow);
+    return section;
   }
 
   function _renderArxivTopics() {

@@ -333,6 +333,43 @@ main {
   color: var(--muted);
 }
 
+.nasa-api-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-ui);
+}
+.nasa-api-note a { color: var(--accent); }
+.nasa-api-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+.nasa-api-input {
+  flex: 1;
+  font-size: 0.82rem;
+  font-family: var(--font-ui);
+  padding: 6px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.nasa-api-input:focus { border-color: var(--accent); }
+.nasa-api-save {
+  font-size: 0.82rem;
+  font-family: var(--font-ui);
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .source-label {
   display: flex;
   align-items: center;
