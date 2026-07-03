@@ -10,7 +10,7 @@ const ALL_ADAPTERS = [
   ArxivAdapter,
   PubMedAdapter,
   NasaAdapter,
-  // PoetryAdapter,     <- next: load adapters/poetry.js + add here
+  PoetryAdapter,
   // ComicsAdapter,     <- load adapters/comics.js + add here
   // GutenbergAdapter,  <- load adapters/gutenberg.js + add here
 ];

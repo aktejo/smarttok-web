@@ -1,8 +1,8 @@
 # SmartTok (web)
 
 An endless feed of curated content — Wikipedia, Dogs, Cats, arXiv, PubMed,
-and NASA APOD — pulled live from public APIs. Plain HTML/CSS/JS, no build
-step, no framework.
+NASA APOD, and Poetry — pulled live from public APIs. Plain HTML/CSS/JS,
+no build step, no framework.
 
 ## Running locally
 
