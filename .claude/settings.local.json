@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -sI \"https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&count=1\")"
+      "Bash(curl -sI \"https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&count=1\")",
+      "Bash(vercel --prod)",
+      "mcp__Claude_Preview__preview_start",
+      "WebFetch(domain:smarttok-web-6.vercel.app)",
+      "Bash(curl -s --max-time 15 -D - -o /dev/null \"https://dog.ceo/api/breeds/image/random\")",
+      "Bash(curl -s --max-time 15 -D /dev/stdout \"https://api.thedogapi.com/v1/images/search\")",
+      "Bash(vercel ls *)",
+      "Bash(curl -s --max-time 15 \"https://smarttok-web-6.vercel.app/\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartTok — source verification</title>
+<meta name="description" content="Live end-to-end checks for every SmartTok content source.">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .verify-wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+  .verify-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .verify-head h1 { font-size: 1.4rem; margin: 0; }
+  #verify-summary { font-family: var(--font-ui); font-weight: 600; }
+  #verify-summary.pass { color: #2e7d32; }
+  #verify-summary.fail { color: #b3402a; }
+  .verify-note { font-family: var(--font-ui); font-size: 0.85rem; color: var(--muted); margin: 6px 0 20px; }
+  #rerun-btn {
+    font-family: var(--font-ui); font-size: 0.82rem; padding: 6px 14px;
+    border-radius: 8px; border: 1px solid var(--hairline); background: var(--card-bg, #fff);
+    cursor: pointer;
+  }
+  .v-row {
+    border: 1px solid var(--hairline); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 14px; background: var(--card-bg, #fff);
+  }
+  .v-row header { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--font-ui); }
+  .v-title { font-weight: 600; }
+  .v-status { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; }
+  .v-row.running .v-status { color: var(--muted); }
+  .v-row.pass .v-status { color: #2e7d32; }
+  .v-row.fail .v-status { color: #b3402a; }
+  .v-row.fail { border-color: #b3402a; }
+  .v-subtitle { font-family: var(--font-ui); font-size: 0.78rem; color: var(--muted); }
+  .v-checks { list-style: none; padding: 8px 0 0; margin: 0; font-family: var(--font-ui); font-size: 0.85rem; }
+  .v-checks li { padding: 2px 0; }
+  .v-checks li.ok { color: #2e7d32; }
+  .v-checks li.fail { color: #b3402a; }
+  .v-sample { margin-top: 10px; }
+  .v-sample:empty { display: none; }
+  .v-sample .card { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="verify-wrap">
+  <div class="verify-head">
+    <h1>Source verification</h1>
+    <span id="verify-summary">running…</span>
+    <button id="rerun-btn">Re-run</button>
+  </div>
+  <p class="verify-note">
+    Live end-to-end checks: each source is fetched for real, validated against the
+    NormalizedContent contract, its image probed, and a sample card rendered through
+    the actual feed pipeline. arXiv/PubMed/proxy rows need the serverless proxy
+    (<code>vercel dev</code> locally, or the deployed site).
+  </p>
+  <div id="verify-results"></div>
+</div>
+
+<!-- Same dependency order as index.html, minus feed/settings plumbing -->
+<script src="js/models.js"></script>
+<script src="js/proxy-config.js"></script>
+<script src="adapters/wikipedia.js"></script>
+<script src="adapters/dogs.js"></script>
+<script src="adapters/cats.js"></script>
+<script src="adapters/arxiv.js"></script>
+<script src="adapters/pubmed.js"></script>
+<script src="adapters/nasa.js"></script>
+<script src="adapters/index.js"></script>
+<script src="js/markdown.js"></script>
+<script src="js/summarizer.js"></script>
+<script src="js/likes.js"></script>
+<script src="js/card-view.js"></script>
+<script src="js/verify.js"></script>
+
+</body>
+</html>
