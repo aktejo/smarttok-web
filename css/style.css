@@ -333,6 +333,24 @@ main {
   color: var(--muted);
 }
 
+.card-simple {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin: 0 0 var(--space-2);
+}
+.card-simple.pending {
+  color: var(--muted);
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .nasa-api-note {
   font-size: 0.8rem;
   color: var(--muted);

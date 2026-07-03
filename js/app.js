@@ -90,7 +90,10 @@
     }
   }
 
+  let initialLoadInProgress = false;
+
   feed.addEventListener("loading-start", () => {
+    initialLoadInProgress = true;
     visibilityObserver.disconnect(); // drop observations of cards about to be removed
     feedListEl.innerHTML = "";
     showSkeletons(3);
@@ -98,6 +101,7 @@
 
   let lastRenderedCount = 0;
   feed.addEventListener("loaded-initial", () => {
+    initialLoadInProgress = false;
     clearSkeletons();
     lastRenderedCount = 0;
     renderFeedAppend(0);
@@ -106,6 +110,7 @@
   });
 
   feed.addEventListener("loaded-more", () => {
+    if (initialLoadInProgress) return; // loaded-initial will render the full batch
     renderFeedAppend(lastRenderedCount);
     lastRenderedCount = feed.items.length;
   });
@@ -278,9 +283,86 @@
         settingsListEl.appendChild(_renderNasaApiKey());
       }
     }
+    settingsListEl.appendChild(_renderAiSummaries());
     const clearBtn = document.getElementById("clear-history-btn");
     clearBtn.textContent = `Clear history (${history.entries.length} card${history.entries.length === 1 ? "" : "s"})`;
     clearBtn.disabled = history.entries.length === 0;
+  }
+
+  function _renderAiSummaries() {
+    const section = document.createElement("div");
+    section.className = "arxiv-topics";
+
+    const heading = document.createElement("div");
+    heading.className = "arxiv-topics-heading";
+    heading.textContent = "AI summaries";
+    section.appendChild(heading);
+
+    const note = document.createElement("p");
+    note.className = "nasa-api-note";
+    section.appendChild(note);
+
+    const state = SummaryManager.availabilityState;
+
+    if (!SummaryManager.supported() || state === "unavailable") {
+      note.textContent =
+        "Plain-English one-liners for arXiv/PubMed papers, generated on-device " +
+        "by your browser's built-in AI. Needs Chrome 138+ on desktop — not " +
+        "available in this browser. Nothing is ever sent to a server.";
+      return section;
+    }
+
+    if (state === "downloadable" || state === "downloading") {
+      note.textContent =
+        "Plain-English one-liners for arXiv/PubMed papers, generated on-device. " +
+        "Chrome downloads a small AI model once (a few hundred MB); after that " +
+        "it's free forever and works offline. Nothing is ever sent to a server.";
+      const btn = document.createElement("button");
+      btn.className = "nasa-api-save";
+      btn.textContent = state === "downloading" ? "Downloading…" : "Download model & enable";
+      btn.disabled = state === "downloading";
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        btn.textContent = "Starting download…";
+        try {
+          await SummaryManager.ensureModel((p) => {
+            btn.textContent = `Downloading… ${Math.round(p * 100)}%`;
+          });
+          SummaryManager.setEnabled(true);
+          renderSettingsView();
+          feed.loadInitial(); // re-render feed so summaries show up right away
+        } catch (_) {
+          btn.disabled = false;
+          btn.textContent = "Download failed — try again";
+        }
+      });
+      section.appendChild(btn);
+      return section;
+    }
+
+    // state === "available" — normal on/off toggle
+    note.textContent =
+      "Plain-English one-liners on arXiv/PubMed papers, generated on-device " +
+      "by your browser's built-in AI. Free, offline-capable; nothing is ever " +
+      "sent to a server.";
+    const row = document.createElement("div");
+    row.className = "source-row source-row--sub";
+    const label = document.createElement("div");
+    label.className = "source-label";
+    label.textContent = "Show summaries";
+    row.appendChild(label);
+
+    const isOn = SummaryManager.enabled();
+    const toggle = document.createElement("button");
+    toggle.className = "toggle" + (isOn ? " on" : "");
+    toggle.setAttribute("aria-label", "Toggle AI summaries");
+    toggle.addEventListener("click", () => {
+      SummaryManager.setEnabled(!isOn);
+      renderSettingsView();
+    });
+    row.appendChild(toggle);
+    section.appendChild(row);
+    return section;
   }
 
   function _renderNasaApiKey() {
@@ -407,5 +489,7 @@
   });
 
   // ---------- Boot ----------
-  feed.loadInitial();
+  // Resolve the on-device summarizer's availability first (a fast local
+  // check) so the first rendered cards can already include summaries.
+  SummaryManager.init().finally(() => feed.loadInitial());
 })();

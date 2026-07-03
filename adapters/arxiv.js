@@ -16,6 +16,7 @@ const ArxivAdapter = {
   sourceKey: "arxiv",
   displayName: "arXiv",
   icon: "🧪",
+  simplify: true, // paper abstracts get on-device plain-English one-liners (js/summarizer.js)
 
   TOPICS_STORAGE_KEY: "smarttok.arxivTopics",
 

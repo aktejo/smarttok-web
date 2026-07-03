@@ -39,6 +39,16 @@ function createCardElement(content, { likesManager, onImageTap }) {
     body.appendChild(title);
   }
 
+  // Plain-English AI one-liner between title and body, for sources that
+  // opt in (adapter.simplify) — no-op unless the on-device model is ready.
+  if (
+    typeof SummaryManager !== "undefined" &&
+    sourceMeta?.simplify &&
+    !content.tags?.includes("error")
+  ) {
+    SummaryManager.attach(body, content);
+  }
+
   const text = document.createElement("div");
   text.className = "card-text";
   text.innerHTML = renderMarkdownBody(content.body);
