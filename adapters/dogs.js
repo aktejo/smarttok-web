@@ -1,7 +1,10 @@
 /**
  * Dogs adapter.
- * Combines two free, keyless public APIs into one card:
+ * Combines free, keyless public APIs into one card:
  *   - Picture: Dog CEO API — https://dog.ceo/dog-api/
+ *              falling back to TheDogAPI — https://thedogapi.com/
+ *              (dog.ceo has real outages — it was serving HTTP 520s for a
+ *              while — so the picture comes from whichever responds)
  *   - Fact:    Dog API by kinduff (v2, JSON:API format) — https://dogapi.dog/
  */
 const DogsAdapter = {
@@ -45,11 +48,26 @@ const DogsAdapter = {
   },
 
   async _fetchImage() {
+    return (await this._fetchImageDogCeo()) || (await this._fetchImageTheDogApi());
+  },
+
+  async _fetchImageDogCeo() {
     try {
       const res = await fetch("https://dog.ceo/api/breeds/image/random");
       if (!res.ok) return null;
       const data = await res.json();
       return data.status === "success" ? data.message : null;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  async _fetchImageTheDogApi() {
+    try {
+      const res = await fetch("https://api.thedogapi.com/v1/images/search");
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data?.[0]?.url || null;
     } catch (_) {
       return null;
     }

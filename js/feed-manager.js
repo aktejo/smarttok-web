@@ -13,6 +13,11 @@
  *     viewport, not merely fetched/appended to the DOM.
  */
 class FeedManager extends EventTarget {
+  // Hard cap on how long one source can take. Without this, a single hung
+  // fetch (e.g. a proxy that accepts the connection but never responds)
+  // leaves isLoading stuck true and kills infinite scroll for the session.
+  static SOURCE_TIMEOUT_MS = 20000;
+
   constructor(settingsManager, historyManager) {
     super();
     this.settings = settingsManager;
@@ -97,7 +102,10 @@ class FeedManager extends EventTarget {
       const adapter = ADAPTERS_BY_KEY[key];
       if (!adapter) return [];
       try {
-        const results = await adapter.fetchNext(n);
+        const results = await this._withTimeout(
+          adapter.fetchNext(n),
+          FeedManager.SOURCE_TIMEOUT_MS
+        );
         for (let i = 0; i < n; i++) this.mixer.recordFetch(key);
         return results;
       } catch (_) {
@@ -108,6 +116,15 @@ class FeedManager extends EventTarget {
 
     const batches = await Promise.all(fetches);
     return batches.flat();
+  }
+
+  _withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("source timed out")), ms)
+      ),
+    ]);
   }
 
   _shuffle(arr) {

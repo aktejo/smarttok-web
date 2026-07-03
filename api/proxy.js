@@ -25,6 +25,12 @@ const ALLOWED_HOSTS = new Set([
 
 const TIMEOUT_MS = 10000;
 
+// NCBI (and arXiv) rate-limit per source IP, and this function's egress IP
+// is shared with other Vercel customers — so upstream 429s can happen even
+// when our own traffic is modest. Their limits are per-second windows, so
+// a short, jittered pause and a retry usually clears them.
+const RETRY_DELAYS_MS = [400, 900];
+
 export default async function handler(req, res) {
   // CORS preflight + response headers — wide open since this only ever
   // proxies public, read-only, keyless GET endpoints.
@@ -70,19 +76,30 @@ export default async function handler(req, res) {
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const upstream = await fetch(parsed.toString(), {
-      headers: { Accept: "application/json, application/xml, text/xml, */*" },
-      signal: controller.signal,
-    });
+    const doFetch = () =>
+      fetch(parsed.toString(), {
+        headers: { Accept: "application/json, application/xml, text/xml, */*" },
+        signal: controller.signal,
+      });
+
+    let upstream = await doFetch();
+    for (const delay of RETRY_DELAYS_MS) {
+      if (upstream.status !== 429) break;
+      await new Promise((r) => setTimeout(r, delay + Math.random() * 200));
+      upstream = await doFetch();
+    }
 
     const contentType = upstream.headers.get("content-type") || "text/plain";
     const body = await upstream.text();
 
     res.status(upstream.status);
     res.setHeader("Content-Type", contentType);
-    // Light caching: these are public, slowly-changing-enough feeds, and
-    // caching cuts upstream load from repeat fetches across users.
-    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+    if (upstream.ok) {
+      // Light caching: these are public, slowly-changing-enough feeds, and
+      // caching cuts upstream load from repeat fetches across users. Only
+      // on success — caching an error body would pin the failure for 60s.
+      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+    }
     res.send(body);
   } catch (err) {
     const timedOut = err.name === "AbortError";
