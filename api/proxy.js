@@ -21,6 +21,8 @@
 const ALLOWED_HOSTS = new Set([
   "export.arxiv.org",
   "eutils.ncbi.nlm.nih.gov",
+  "www.gutenberg.org", // book text files (no CORS upstream); Range requests
+  "gutenberg.org",
 ]);
 
 const TIMEOUT_MS = 10000;
@@ -36,7 +38,7 @@ export default async function handler(req, res) {
   // proxies public, read-only, keyless GET endpoints.
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range");
 
   if (req.method === "OPTIONS") {
     res.status(204).end();
@@ -76,9 +78,14 @@ export default async function handler(req, res) {
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
+    const upstreamHeaders = { Accept: "application/json, application/xml, text/xml, */*" };
+    // Forward Range so text-heavy sources (Gutenberg books run to megabytes)
+    // can fetch just the opening slice instead of the whole file.
+    if (req.headers.range) upstreamHeaders.Range = req.headers.range;
+
     const doFetch = () =>
       fetch(parsed.toString(), {
-        headers: { Accept: "application/json, application/xml, text/xml, */*" },
+        headers: upstreamHeaders,
         signal: controller.signal,
       });
 
@@ -94,10 +101,11 @@ export default async function handler(req, res) {
 
     res.status(upstream.status);
     res.setHeader("Content-Type", contentType);
-    if (upstream.ok) {
+    if (upstream.status === 200) {
       // Light caching: these are public, slowly-changing-enough feeds, and
       // caching cuts upstream load from repeat fetches across users. Only
-      // on success — caching an error body would pin the failure for 60s.
+      // full 200s — caching an error body would pin the failure for 60s,
+      // and caching a 206 partial could serve a slice to a full request.
       res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
     }
     res.send(body);

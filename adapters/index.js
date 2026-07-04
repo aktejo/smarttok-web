@@ -11,8 +11,8 @@ const ALL_ADAPTERS = [
   PubMedAdapter,
   NasaAdapter,
   PoetryAdapter,
+  GutenbergAdapter,
   // ComicsAdapter,     <- load adapters/comics.js + add here
-  // GutenbergAdapter,  <- load adapters/gutenberg.js + add here
 ];
 
 const ADAPTERS_BY_KEY = Object.fromEntries(

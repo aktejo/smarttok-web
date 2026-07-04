@@ -18,10 +18,15 @@ const PoetryAdapter = {
 
   // Epics don't fit a feed card; clip long poems and mark the cut.
   MAX_LINES: 24,
+  REQUEST_TIMEOUT_MS: 8000, // PoetryDB (Heroku) can stall on cold dynos
 
   async fetchNext(count = 3) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
     try {
-      const res = await fetch(`https://poetrydb.org/random/${count}`);
+      const res = await fetch(`https://poetrydb.org/random/${count}`, {
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const poems = await res.json();
       if (!Array.isArray(poems)) throw new Error("unexpected response shape");
@@ -35,6 +40,8 @@ const PoetryAdapter = {
       return Array.from({ length: count }, () =>
         makeErrorContent(this.sourceKey, this.displayName, null)
       );
+    } finally {
+      clearTimeout(timer);
     }
   },
 
