@@ -23,8 +23,12 @@ class SettingsManager extends EventTarget {
     } catch (_) {
       /* fall through to default */
     }
-    // Default: every registered adapter enabled.
-    return new Set(ALL_ADAPTERS.map((a) => a.sourceKey));
+    // Default: every registered adapter enabled, unless it opts out
+    // (adapter.defaultEnabled === false — e.g. sources that need a server
+    // key configured before they can return real content).
+    return new Set(
+      ALL_ADAPTERS.filter((a) => a.defaultEnabled !== false).map((a) => a.sourceKey)
+    );
   }
 
   _save() {

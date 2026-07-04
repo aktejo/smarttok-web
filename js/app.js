@@ -306,7 +306,7 @@
 
     if (!SummaryManager.supported() || state === "unavailable") {
       note.textContent =
-        "Plain-English one-liners for arXiv/PubMed papers, generated on-device " +
+        "Plain-English one-liners for research papers (arXiv, PubMed, CORE), generated on-device " +
         "by your browser's built-in AI. Needs Chrome 138+ on desktop — not " +
         "available in this browser. Nothing is ever sent to a server.";
       return section;
@@ -314,7 +314,7 @@
 
     if (state === "downloadable" || state === "downloading") {
       note.textContent =
-        "Plain-English one-liners for arXiv/PubMed papers, generated on-device. " +
+        "Plain-English one-liners for research papers (arXiv, PubMed, CORE), generated on-device. " +
         "Chrome downloads a small AI model once (a few hundred MB); after that " +
         "it's free forever and works offline. Nothing is ever sent to a server.";
       const btn = document.createElement("button");
@@ -342,7 +342,7 @@
 
     // state === "available" — normal on/off toggle
     note.textContent =
-      "Plain-English one-liners on arXiv/PubMed papers, generated on-device " +
+      "Plain-English one-liners on research papers (arXiv, PubMed, CORE), generated on-device " +
       "by your browser's built-in AI. Free, offline-capable; nothing is ever " +
       "sent to a server.";
     const row = document.createElement("div");

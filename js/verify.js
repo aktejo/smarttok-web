@@ -277,6 +277,9 @@
           ? "using personal API key"
           : "using shared DEMO_KEY (30 req/hr — may be rate-limited)";
       }
+      if (adapter.sourceKey === "core") {
+        subtitle = "needs CORE_API_KEY on the proxy — the anonymous quota is tiny";
+      }
       const row = makeRow(`${adapter.icon} ${adapter.displayName}`, subtitle);
       jobs.push(
         verifySource(adapter).then((result) => {

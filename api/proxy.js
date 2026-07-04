@@ -23,6 +23,7 @@ const ALLOWED_HOSTS = new Set([
   "eutils.ncbi.nlm.nih.gov",
   "www.gutenberg.org", // book text files (no CORS upstream); Range requests
   "gutenberg.org",
+  "api.core.ac.uk",    // open-access papers (no CORS upstream); optional key below
 ]);
 
 const TIMEOUT_MS = 10000;
@@ -82,6 +83,13 @@ export default async function handler(req, res) {
     // Forward Range so text-heavy sources (Gutenberg books run to megabytes)
     // can fetch just the opening slice instead of the whole file.
     if (req.headers.range) upstreamHeaders.Range = req.headers.range;
+    // CORE works anonymously but is tightly rate-limited; a free registered
+    // key (https://core.ac.uk/services/api) lifts the limit. Set it with
+    // `vercel env add CORE_API_KEY` — injected server-side only, so it never
+    // reaches browsers or the repo.
+    if (parsed.hostname === "api.core.ac.uk" && process.env.CORE_API_KEY) {
+      upstreamHeaders.Authorization = `Bearer ${process.env.CORE_API_KEY}`;
+    }
 
     const doFetch = () =>
       fetch(parsed.toString(), {
