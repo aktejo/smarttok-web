@@ -23,10 +23,15 @@ const CoreAdapter = {
   displayName: "CORE",
   icon: "🎓",
   simplify: true, // paper abstracts get on-device plain-English one-liners (js/summarizer.js)
-  // Off until enabled in Settings: without CORE_API_KEY on the proxy the
-  // anonymous quota is so small that most visitors would only see error
-  // cards. Remove this once the env var is configured.
+  // Off until enabled in Settings, and tucked under the Experiments
+  // section there: without CORE_API_KEY on the proxy the anonymous quota
+  // is so small that most visitors would only see error cards. Remove
+  // both flags once the env var is configured.
   defaultEnabled: false,
+  experimental: true,
+  settingsNote:
+    "Needs a free CORE API key configured on the server (see README) — " +
+    "without it, cards will usually fail to load.",
 
   _queries: [
     "climate change", "artificial intelligence", "renewable energy",

@@ -250,32 +250,65 @@
     }
   });
 
+  function _renderSourceRow(adapter) {
+    const row = document.createElement("div");
+    row.className = "source-row";
+
+    const label = document.createElement("div");
+    label.className = "source-label";
+    label.innerHTML = `<span class="source-icon">${adapter.icon}</span><span>${adapter.displayName}</span>`;
+    row.appendChild(label);
+
+    const isOn = settings.isEnabled(adapter.sourceKey);
+    const onlyOneEnabled = settings.getEnabledKeys().length === 1 && isOn;
+
+    const toggle = document.createElement("button");
+    toggle.className = "toggle" + (isOn ? " on" : "");
+    toggle.setAttribute("aria-label", `Toggle ${adapter.displayName}`);
+    if (onlyOneEnabled) toggle.disabled = true;
+    toggle.addEventListener("click", () => {
+      settings.toggle(adapter.sourceKey);
+      renderSettingsView();
+    });
+    row.appendChild(toggle);
+    return row;
+  }
+
+  // Survives re-renders (every toggle click re-renders the whole view).
+  let experimentsOpen = false;
+
+  function _renderExperiments(adapters) {
+    const details = document.createElement("details");
+    details.className = "experiments";
+    details.open = experimentsOpen;
+    details.addEventListener("toggle", () => { experimentsOpen = details.open; });
+
+    const summary = document.createElement("summary");
+    summary.textContent = "Experiments";
+    details.appendChild(summary);
+
+    for (const adapter of adapters) {
+      details.appendChild(_renderSourceRow(adapter));
+      if (adapter.settingsNote) {
+        const note = document.createElement("p");
+        note.className = "source-note";
+        note.textContent = adapter.settingsNote;
+        details.appendChild(note);
+      }
+    }
+    return details;
+  }
+
   function renderSettingsView() {
     settingsListEl.innerHTML = "";
-    for (const adapter of ALL_ADAPTERS) {
-      const row = document.createElement("div");
-      row.className = "source-row";
+    // Experimental sources (adapter.experimental) live in a collapsed
+    // section at the bottom instead of the main list.
+    const mainAdapters = ALL_ADAPTERS.filter((a) => !a.experimental);
+    const experimentalAdapters = ALL_ADAPTERS.filter((a) => a.experimental);
 
-      const label = document.createElement("div");
-      label.className = "source-label";
-      label.innerHTML = `<span class="source-icon">${adapter.icon}</span><span>${adapter.displayName}</span>`;
-      row.appendChild(label);
-
+    for (const adapter of mainAdapters) {
+      settingsListEl.appendChild(_renderSourceRow(adapter));
       const isOn = settings.isEnabled(adapter.sourceKey);
-      const onlyOneEnabled = settings.getEnabledKeys().length === 1 && isOn;
-
-      const toggle = document.createElement("button");
-      toggle.className = "toggle" + (isOn ? " on" : "");
-      toggle.setAttribute("aria-label", `Toggle ${adapter.displayName}`);
-      if (onlyOneEnabled) toggle.disabled = true;
-      toggle.addEventListener("click", () => {
-        settings.toggle(adapter.sourceKey);
-        renderSettingsView();
-      });
-      row.appendChild(toggle);
-
-      settingsListEl.appendChild(row);
-
       if (adapter.sourceKey === "arxiv" && isOn) {
         settingsListEl.appendChild(_renderArxivTopics());
       }
@@ -284,6 +317,9 @@
       }
     }
     settingsListEl.appendChild(_renderAiSummaries());
+    if (experimentalAdapters.length > 0) {
+      settingsListEl.appendChild(_renderExperiments(experimentalAdapters));
+    }
     const clearBtn = document.getElementById("clear-history-btn");
     clearBtn.textContent = `Clear history (${history.entries.length} card${history.entries.length === 1 ? "" : "s"})`;
     clearBtn.disabled = history.entries.length === 0;
