@@ -18,17 +18,18 @@
 
   <section id="rd-saved" class="rd-sheet">
     <div class="rd-sheet-head">
-      <h2>Saved</h2>
+      <h2>Liked</h2>
       <button id="rd-saved-edit" class="rd-edit-btn">Edit</button>
     </div>
     <div id="rd-saved-chips" class="rd-chips"></div>
     <div id="rd-saved-list"></div>
   </section>
 
-  <section id="rd-search" class="rd-sheet">
-    <h2>Search</h2>
-    <input class="rd-search-box" type="search" placeholder="Search everything…" aria-label="Search">
-    <p class="rd-hint">Concept mock — search isn't wired up yet. This tab exists to workshop the navigation.</p>
+  <section id="rd-history" class="rd-sheet">
+    <div class="rd-sheet-head">
+      <h2>History</h2>
+    </div>
+    <div id="rd-history-list"></div>
   </section>
 
   <section id="rd-sources" class="rd-sheet">
@@ -40,8 +41,8 @@
 
   <nav class="rd-nav">
     <button data-tab="today" data-icon="home" data-label="Today" class="active"></button>
-    <button data-tab="saved" data-icon="bookmark" data-label="Saved"></button>
-    <button data-tab="search" data-icon="search" data-label="Search"></button>
+    <button data-tab="saved" data-icon="heart" data-label="Liked"></button>
+    <button data-tab="history" data-icon="clock" data-label="History"></button>
     <button data-tab="sources" data-icon="grid" data-label="Sources"></button>
   </nav>
 </div>

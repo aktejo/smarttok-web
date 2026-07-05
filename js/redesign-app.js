@@ -10,17 +10,23 @@
 (function () {
   const settings = new SettingsManager();
   const likes = new LikesManager();
-  // Ephemeral history: dedup within this visit only; nothing persisted.
+  // Ephemeral history: dedup + History tab within this visit only; nothing
+  // persisted, so workshopping never marks cards "seen" for the real feed.
   const ephemeralHistory = {
     seen: new Set(),
+    entries: [], // {content, seenAt}, oldest first
     hasSeen(id) { return this.seen.has(id); },
-    record(content) { this.seen.add(content.id); },
+    record(content) {
+      if (this.seen.has(content.id)) return;
+      this.seen.add(content.id);
+      this.entries.push({ content, seenAt: Date.now() });
+    },
   };
   const feed = new FeedManager(settings, ephemeralHistory);
 
   const scrollerEl = document.getElementById("rd-scroller");
   const savedSheet = document.getElementById("rd-saved");
-  const searchSheet = document.getElementById("rd-search");
+  const historySheet = document.getElementById("rd-history");
   const sourcesSheet = document.getElementById("rd-sources");
 
   let activeTab = "today";
@@ -32,6 +38,7 @@
     heart: '<svg viewBox="0 0 24 24"><path d="M12 20.8s-8.2-5-10-9.4C.6 7.8 2.8 4.6 6 4.6c2 0 3.5 1.1 4.4 2.4l1.6 2.1 1.6-2.1c.9-1.3 2.4-2.4 4.4-2.4 3.2 0 5.4 3.2 4 6.8-1.8 4.4-10 9.4-10 9.4z"/></svg>',
     share: '<svg viewBox="0 0 24 24"><path d="M12 3v12M12 3l-4 4M12 3l4 4M5 12v8h14v-8"/></svg>',
     open: '<svg viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8M19 14v5H5V5h5"/></svg>',
+    clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
     home: '<svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>',
     search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>',
     grid: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>',
@@ -48,8 +55,13 @@
     return { text: body.slice(0, m.index), byline: m[1] };
   }
 
-  function readMinutes(text) {
-    return Math.max(1, Math.round(text.split(/\s+/).length / 200));
+  function relativeTime(ts) {
+    const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (s < 60) return "just now";
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
   }
 
   function createRedesignCard(content) {
@@ -87,14 +99,19 @@
       card.appendChild(media);
     }
 
+    // body is the scroll container on image cards (the whole inner sheet
+    // rides up over the fixed hero image); on text cards .rd-text scrolls.
     const body = document.createElement("div");
     body.className = "rd-body";
+    const inner = document.createElement("div");
+    inner.className = "rd-body-inner";
+    body.appendChild(inner);
 
     if (content.title) {
       const h1 = document.createElement("h1");
       h1.className = "rd-title";
       h1.textContent = content.title;
-      body.appendChild(h1);
+      inner.appendChild(h1);
     }
 
     if (byline || credit || content.timestamp) {
@@ -104,19 +121,19 @@
       bylineEl.textContent = [byline, credit, byline?.includes(year) ? null : year]
         .filter(Boolean)
         .join(" · ");
-      body.appendChild(bylineEl);
+      inner.appendChild(bylineEl);
     }
 
     if (isPaper) {
       const section = document.createElement("div");
       section.className = "rd-section";
       section.textContent = "Abstract";
-      body.appendChild(section);
+      inner.appendChild(section);
     }
 
     // On-device AI one-liner, same pipeline as the production UI.
     if (typeof SummaryManager !== "undefined" && isPaper && !content.tags?.includes("error")) {
-      SummaryManager.attach(body, content);
+      SummaryManager.attach(inner, content);
     }
 
     // Full text, no clamp: if it overflows its region it becomes its own
@@ -126,7 +143,7 @@
     const textEl = document.createElement("div");
     textEl.className = "rd-text";
     textEl.textContent = text;
-    body.appendChild(textEl);
+    inner.appendChild(textEl);
     card.appendChild(body);
 
     // Right-side action rail, reels-style: like / share / open.
@@ -220,16 +237,37 @@
     renderedCount = feed.items.length;
     observeLastCards();
 
-    // Mark overflowing text regions as their own scroll areas. Only those
-    // get overscroll containment — short texts stay transparent to the
-    // card snap, so swiping on them still advances the feed.
+    // Mark overflowing regions as their own scroll areas: on image cards
+    // the whole body sheet scrolls up over the hero image; on text cards
+    // just the text scrolls. Only overflowing regions get overscroll
+    // containment — short content stays transparent to the card snap.
+    // Also start watching each card for the History tab (60% visible).
     requestAnimationFrame(() => {
-      for (const t of scrollerEl.querySelectorAll(".rd-text:not(.measured)")) {
-        t.classList.add("measured");
-        if (t.scrollHeight > t.clientHeight + 4) t.classList.add("scrollable");
+      for (const cardEl of scrollerEl.querySelectorAll(".rd-card:not(.measured)")) {
+        cardEl.classList.add("measured");
+        const target = cardEl.classList.contains("has-media")
+          ? cardEl.querySelector(".rd-body")
+          : cardEl.querySelector(".rd-text");
+        if (target && target.scrollHeight > target.clientHeight + 4) {
+          target.classList.add("scrollable");
+        }
+        seenObserver.observe(cardEl);
       }
     });
   }
+
+  // Record a card into this visit's history once it's actually been seen.
+  const seenObserver = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        const item = feed.items.find((i) => i.id === e.target.dataset.id);
+        if (item) ephemeralHistory.record(item);
+        seenObserver.unobserve(e.target);
+      }
+    },
+    { threshold: 0.6 }
+  );
 
   feed.addEventListener("loading-start", () => {
     renderedCount = 0;
@@ -295,10 +333,47 @@
     renderSaved();
   });
 
-  function savedMetaLine(content, text) {
+  function savedMetaLine(content) {
     if (content.sourceKey === "gutenberg") return "Free ebook";
-    const year = content.timestamp ? String(content.timestamp).slice(0, 4) : null;
-    return [year, `${readMinutes(text)} min read`].filter(Boolean).join(" · ");
+    return content.timestamp ? String(content.timestamp).slice(0, 4) : "";
+  }
+
+  /** Shared compact list row used by the Liked and History pages. */
+  function buildListRow(content, metaText) {
+    const sourceMeta = ADAPTERS_BY_KEY[content.sourceKey];
+    const { text, byline } = splitByline(content.body || "");
+    const title = content.title || text.slice(0, 80);
+    // No-title sources use their body as the title — don't repeat it below.
+    const desc = byline || (content.title ? text.replace(/\s+/g, " ").trim() : "");
+
+    const row = document.createElement("div");
+    row.className = "rd-saved-row";
+
+    const textWrap = document.createElement("div");
+    textWrap.className = "rd-saved-text";
+    textWrap.innerHTML = `
+      <div class="rd-saved-src"><span class="rd-mini-badge">${sourceMeta?.icon || "•"}</span><span>${sourceMeta?.displayName || content.attribution}</span></div>
+      <div class="rd-saved-title"></div>
+      <div class="rd-saved-desc"></div>
+      <div class="rd-saved-meta"></div>`;
+    textWrap.querySelector(".rd-saved-title").textContent = title;
+    const descEl = textWrap.querySelector(".rd-saved-desc");
+    if (desc) descEl.textContent = desc;
+    else descEl.remove();
+    const metaEl = textWrap.querySelector(".rd-saved-meta");
+    if (metaText) metaEl.textContent = metaText;
+    else metaEl.remove();
+    row.appendChild(textWrap);
+
+    if (content.media?.url) {
+      const thumb = document.createElement("img");
+      thumb.className = "rd-saved-thumb";
+      thumb.src = content.media.url;
+      thumb.alt = content.media.alt || "";
+      thumb.loading = "lazy";
+      row.appendChild(thumb);
+    }
+    return row;
   }
 
   function renderSaved() {
@@ -332,61 +407,51 @@
     if (entries.length === 0) {
       listEl.innerHTML = `<p class="rd-hint">${
         savedFilter === "all"
-          ? "Nothing saved yet — tap the bookmark on any card."
-          : "Nothing saved in this category yet."
+          ? "Nothing liked yet — double-tap any card, or tap its heart."
+          : "Nothing liked in this category yet."
       }</p>`;
       return;
     }
 
     for (const entry of entries) {
       const content = entry.content;
-      const sourceMeta = ADAPTERS_BY_KEY[content.sourceKey];
-      const { text, byline } = splitByline(content.body || "");
-
-      const title = content.title || text.slice(0, 80);
-      // No-title sources use their body as the title — don't repeat it below.
-      const desc = byline || (content.title ? text.replace(/\s+/g, " ").trim() : "");
-
-      const row = document.createElement("div");
-      row.className = "rd-saved-row" + (savedEditMode ? " editing" : "");
+      const row = buildListRow(content, savedMetaLine(content));
 
       if (savedEditMode) {
+        row.classList.add("editing");
         const removeBtn = document.createElement("button");
         removeBtn.className = "rd-remove-btn";
-        removeBtn.setAttribute("aria-label", `Remove "${title}" from Saved`);
+        removeBtn.setAttribute("aria-label", `Remove from Liked`);
         removeBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>';
         removeBtn.addEventListener("click", () => {
           likes.toggle(content);
           row.classList.add("removing");
           setTimeout(renderSaved, 180); // let the slide-out play before re-rendering
         });
-        row.appendChild(removeBtn);
-      }
-
-      const textWrap = document.createElement("div");
-      textWrap.className = "rd-saved-text";
-      textWrap.innerHTML = `
-        <div class="rd-saved-src"><span class="rd-mini-badge">${sourceMeta?.icon || "•"}</span><span>${sourceMeta?.displayName || content.attribution}</span></div>
-        <div class="rd-saved-title"></div>
-        <div class="rd-saved-desc"></div>
-        <div class="rd-saved-meta">${savedMetaLine(content, text)}</div>`;
-      textWrap.querySelector(".rd-saved-title").textContent = title;
-      textWrap.querySelector(".rd-saved-desc").textContent = desc;
-      row.appendChild(textWrap);
-
-      if (content.media?.url) {
-        const thumb = document.createElement("img");
-        thumb.className = "rd-saved-thumb";
-        thumb.src = content.media.url;
-        thumb.alt = content.media.alt || "";
-        thumb.loading = "lazy";
-        row.appendChild(thumb);
-      }
-
-      // Tapping a row opens the original — but not while editing.
-      if (content.openLink && !savedEditMode) {
+        row.prepend(removeBtn);
+      } else if (content.openLink) {
+        // Tapping a row opens the original — but not while editing.
         row.classList.add("linked");
         row.addEventListener("click", () => window.open(content.openLink, "_blank", "noopener"));
+      }
+      listEl.appendChild(row);
+    }
+  }
+
+  // ---------- History (this visit, newest first) ----------
+  function renderHistory() {
+    const listEl = document.getElementById("rd-history-list");
+    listEl.innerHTML = "";
+    const entries = [...ephemeralHistory.entries].reverse();
+    if (entries.length === 0) {
+      listEl.innerHTML = `<p class="rd-hint">Cards you've scrolled past this visit will show up here, newest first.</p>`;
+      return;
+    }
+    for (const entry of entries) {
+      const row = buildListRow(entry.content, relativeTime(entry.seenAt));
+      if (entry.content.openLink) {
+        row.classList.add("linked");
+        row.addEventListener("click", () => window.open(entry.content.openLink, "_blank", "noopener"));
       }
       listEl.appendChild(row);
     }
@@ -469,7 +534,7 @@
     if (name !== "saved") savedEditMode = false; // leaving Saved always exits edit mode
     tabs.forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
     savedSheet.classList.toggle("open", name === "saved");
-    searchSheet.classList.toggle("open", name === "search");
+    historySheet.classList.toggle("open", name === "history");
     sourcesSheet.classList.toggle("open", name === "sources");
 
     if (name === "today") {
@@ -480,6 +545,8 @@
       if (!scrollerEl.children.length) feed.loadInitial();
     } else if (name === "saved") {
       renderSaved();
+    } else if (name === "history") {
+      renderHistory();
     } else if (name === "sources") {
       renderSources();
     }
