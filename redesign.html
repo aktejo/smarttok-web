@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#08080a">
+<title>SmartTok — redesign workshop</title>
+<meta name="description" content="Fullscreen scrollable card concept — a design playground on live data. The production UI lives at index.html.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/redesign.css">
+</head>
+<body>
+
+<div class="rd-frame">
+  <main id="rd-scroller" class="rd-scroller"></main>
+
+  <section id="rd-search" class="rd-sheet">
+    <h2>Search</h2>
+    <input class="rd-search-box" type="search" placeholder="Search everything…" aria-label="Search">
+    <p class="rd-hint">Concept mock — search isn't wired up yet. This tab exists to workshop the navigation.</p>
+  </section>
+
+  <section id="rd-sources" class="rd-sheet">
+    <h2>Sources</h2>
+    <div id="rd-sources-list"></div>
+    <p class="rd-hint">Same settings store as the main app — toggles here apply everywhere.</p>
+  </section>
+
+  <nav class="rd-nav">
+    <button data-tab="today" data-icon="home" data-label="Today" class="active"></button>
+    <button data-tab="saved" data-icon="bookmark" data-label="Saved"></button>
+    <button data-tab="search" data-icon="search" data-label="Search"></button>
+    <button data-tab="sources" data-icon="grid" data-label="Sources"></button>
+  </nav>
+</div>
+
+<!-- Same engine as index.html — only the view layer is different -->
+<script src="js/models.js"></script>
+<script src="js/proxy-config.js"></script>
+<script src="adapters/wikipedia.js"></script>
+<script src="adapters/dogs.js"></script>
+<script src="adapters/cats.js"></script>
+<script src="adapters/arxiv.js"></script>
+<script src="adapters/pubmed.js"></script>
+<script src="adapters/nasa.js"></script>
+<script src="adapters/poetry.js"></script>
+<script src="adapters/gutenberg.js"></script>
+<script src="adapters/core.js"></script>
+<script src="adapters/index.js"></script>
+<script src="js/mixer.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/likes.js"></script>
+<script src="js/feed-manager.js"></script>
+<script src="js/summarizer.js"></script>
+<script src="js/redesign-app.js"></script>
+
+</body>
+</html>
