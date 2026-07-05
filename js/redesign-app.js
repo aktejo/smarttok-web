@@ -243,6 +243,12 @@
     cats: "images",
   };
   let savedFilter = "all";
+  let savedEditMode = false;
+
+  document.getElementById("rd-saved-edit").addEventListener("click", () => {
+    savedEditMode = !savedEditMode;
+    renderSaved();
+  });
 
   function savedMetaLine(content, text) {
     if (content.sourceKey === "gutenberg") return "Free ebook";
@@ -253,6 +259,13 @@
   function renderSaved() {
     const chipsEl = document.getElementById("rd-saved-chips");
     const listEl = document.getElementById("rd-saved-list");
+    const editBtn = document.getElementById("rd-saved-edit");
+
+    const anySaved = likes.getAllSortedNewestFirst().length > 0;
+    if (!anySaved) savedEditMode = false;
+    editBtn.hidden = !anySaved;
+    editBtn.textContent = savedEditMode ? "Done" : "Edit";
+    editBtn.classList.toggle("done", savedEditMode);
 
     chipsEl.innerHTML = "";
     for (const f of SAVED_FILTERS) {
@@ -285,14 +298,28 @@
       const sourceMeta = ADAPTERS_BY_KEY[content.sourceKey];
       const { text, byline } = splitByline(content.body || "");
 
-      const row = document.createElement("div");
-      row.className = "rd-saved-row";
-
-      const textWrap = document.createElement("div");
-      textWrap.className = "rd-saved-text";
       const title = content.title || text.slice(0, 80);
       // No-title sources use their body as the title — don't repeat it below.
       const desc = byline || (content.title ? text.replace(/\s+/g, " ").trim() : "");
+
+      const row = document.createElement("div");
+      row.className = "rd-saved-row" + (savedEditMode ? " editing" : "");
+
+      if (savedEditMode) {
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "rd-remove-btn";
+        removeBtn.setAttribute("aria-label", `Remove "${title}" from Saved`);
+        removeBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>';
+        removeBtn.addEventListener("click", () => {
+          likes.toggle(content);
+          row.classList.add("removing");
+          setTimeout(renderSaved, 180); // let the slide-out play before re-rendering
+        });
+        row.appendChild(removeBtn);
+      }
+
+      const textWrap = document.createElement("div");
+      textWrap.className = "rd-saved-text";
       textWrap.innerHTML = `
         <div class="rd-saved-src"><span class="rd-mini-badge">${sourceMeta?.icon || "•"}</span><span>${sourceMeta?.displayName || content.attribution}</span></div>
         <div class="rd-saved-title"></div>
@@ -311,7 +338,8 @@
         row.appendChild(thumb);
       }
 
-      if (content.openLink) {
+      // Tapping a row opens the original — but not while editing.
+      if (content.openLink && !savedEditMode) {
         row.classList.add("linked");
         row.addEventListener("click", () => window.open(content.openLink, "_blank", "noopener"));
       }
@@ -393,6 +421,7 @@
   const tabs = document.querySelectorAll(".rd-nav button");
   function setTab(name) {
     activeTab = name;
+    if (name !== "saved") savedEditMode = false; // leaving Saved always exits edit mode
     tabs.forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
     savedSheet.classList.toggle("open", name === "saved");
     searchSheet.classList.toggle("open", name === "search");
