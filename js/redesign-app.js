@@ -19,6 +19,7 @@
   const feed = new FeedManager(settings, ephemeralHistory);
 
   const scrollerEl = document.getElementById("rd-scroller");
+  const savedSheet = document.getElementById("rd-saved");
   const searchSheet = document.getElementById("rd-search");
   const sourcesSheet = document.getElementById("rd-sources");
 
@@ -221,39 +222,171 @@
     for (const el of [...cards].slice(-2)) nearEndObserver.observe(el);
   }
 
-  // ---------- Tabs ----------
+  // ---------- Saved (compact list with filter chips) ----------
+  const SAVED_FILTERS = [
+    { key: "all", label: "All" },
+    { key: "articles", label: "Articles" },
+    { key: "papers", label: "Papers" },
+    { key: "books", label: "Books" },
+    { key: "poems", label: "Poems" },
+    { key: "images", label: "Images" },
+  ];
+  const CATEGORY_BY_SOURCE = {
+    wikipedia: "articles",
+    arxiv: "papers",
+    pubmed: "papers",
+    core: "papers",
+    gutenberg: "books",
+    poetry: "poems",
+    nasa: "images",
+    dogs: "images",
+    cats: "images",
+  };
+  let savedFilter = "all";
+
+  function savedMetaLine(content, text) {
+    if (content.sourceKey === "gutenberg") return "Free ebook";
+    const year = content.timestamp ? String(content.timestamp).slice(0, 4) : null;
+    return [year, `${readMinutes(text)} min read`].filter(Boolean).join(" · ");
+  }
+
   function renderSaved() {
-    const entries = likes.getAllSortedNewestFirst();
-    scrollerEl.innerHTML = "";
+    const chipsEl = document.getElementById("rd-saved-chips");
+    const listEl = document.getElementById("rd-saved-list");
+
+    chipsEl.innerHTML = "";
+    for (const f of SAVED_FILTERS) {
+      const chip = document.createElement("button");
+      chip.className = "rd-filter-chip" + (savedFilter === f.key ? " active" : "");
+      chip.textContent = f.label;
+      chip.addEventListener("click", () => {
+        savedFilter = f.key;
+        renderSaved();
+      });
+      chipsEl.appendChild(chip);
+    }
+
+    const entries = likes.getAllSortedNewestFirst().filter(
+      (e) => savedFilter === "all" || CATEGORY_BY_SOURCE[e.content.sourceKey] === savedFilter
+    );
+
+    listEl.innerHTML = "";
     if (entries.length === 0) {
-      showState("Nothing saved yet.<br>Tap the bookmark on any card.");
+      listEl.innerHTML = `<p class="rd-hint">${
+        savedFilter === "all"
+          ? "Nothing saved yet — tap the bookmark on any card."
+          : "Nothing saved in this category yet."
+      }</p>`;
       return;
     }
-    const frag = document.createDocumentFragment();
-    for (const entry of entries) frag.appendChild(createRedesignCard(entry.content));
-    scrollerEl.appendChild(frag);
-    scrollerEl.scrollTop = 0;
+
+    for (const entry of entries) {
+      const content = entry.content;
+      const sourceMeta = ADAPTERS_BY_KEY[content.sourceKey];
+      const { text, byline } = splitByline(content.body || "");
+
+      const row = document.createElement("div");
+      row.className = "rd-saved-row";
+
+      const textWrap = document.createElement("div");
+      textWrap.className = "rd-saved-text";
+      const title = content.title || text.slice(0, 80);
+      // No-title sources use their body as the title — don't repeat it below.
+      const desc = byline || (content.title ? text.replace(/\s+/g, " ").trim() : "");
+      textWrap.innerHTML = `
+        <div class="rd-saved-src"><span class="rd-mini-badge">${sourceMeta?.icon || "•"}</span><span>${sourceMeta?.displayName || content.attribution}</span></div>
+        <div class="rd-saved-title"></div>
+        <div class="rd-saved-desc"></div>
+        <div class="rd-saved-meta">${savedMetaLine(content, text)}</div>`;
+      textWrap.querySelector(".rd-saved-title").textContent = title;
+      textWrap.querySelector(".rd-saved-desc").textContent = desc;
+      row.appendChild(textWrap);
+
+      if (content.media?.url) {
+        const thumb = document.createElement("img");
+        thumb.className = "rd-saved-thumb";
+        thumb.src = content.media.url;
+        thumb.alt = content.media.alt || "";
+        thumb.loading = "lazy";
+        row.appendChild(thumb);
+      }
+
+      if (content.openLink) {
+        row.classList.add("linked");
+        row.addEventListener("click", () => window.open(content.openLink, "_blank", "noopener"));
+      }
+      listEl.appendChild(row);
+    }
+  }
+
+  // ---------- Sources (enabled/available sections + frequency concept) ----------
+  const FREQ_KEY_PREFIX = "smarttok.rd.freq.";
+
+  function _sourceRow(adapter, { withFreq }) {
+    const isOn = settings.isEnabled(adapter.sourceKey);
+    const onlyOne = settings.getEnabledKeys().length === 1 && isOn;
+
+    const row = document.createElement("div");
+    row.className = "rd-source-row";
+    row.innerHTML = `<span class="rd-source-name"><span class="rd-source-badge">${adapter.icon}</span><span>${adapter.displayName}</span>${adapter.experimental ? '<span class="beta">beta</span>' : ""}</span>`;
+
+    const controls = document.createElement("span");
+    controls.className = "rd-source-controls";
+
+    if (withFreq) {
+      const wrap = document.createElement("span");
+      wrap.className = "rd-freq-wrap";
+      const select = document.createElement("select");
+      select.className = "rd-freq";
+      select.setAttribute("aria-label", `${adapter.displayName} frequency`);
+      for (const opt of ["Frequently", "Daily", "Weekly"]) {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        select.appendChild(o);
+      }
+      select.value = localStorage.getItem(FREQ_KEY_PREFIX + adapter.sourceKey) || "Frequently";
+      select.addEventListener("change", () => {
+        localStorage.setItem(FREQ_KEY_PREFIX + adapter.sourceKey, select.value);
+      });
+      wrap.appendChild(select);
+      controls.appendChild(wrap);
+    }
+
+    const sw = document.createElement("button");
+    sw.className = "rd-switch" + (isOn ? " on" : "");
+    sw.disabled = onlyOne;
+    sw.setAttribute("aria-label", `Toggle ${adapter.displayName}`);
+    sw.addEventListener("click", () => {
+      settings.toggle(adapter.sourceKey); // FeedManager reloads itself on change
+      renderSources();
+    });
+    controls.appendChild(sw);
+    row.appendChild(controls);
+    return row;
   }
 
   function renderSources() {
     const list = document.getElementById("rd-sources-list");
     list.innerHTML = "";
-    for (const adapter of ALL_ADAPTERS) {
-      const row = document.createElement("div");
-      row.className = "rd-source-row";
-      const isOn = settings.isEnabled(adapter.sourceKey);
-      const onlyOne = settings.getEnabledKeys().length === 1 && isOn;
-      row.innerHTML = `<span class="rd-source-name"><span>${adapter.icon}</span><span>${adapter.displayName}</span>${adapter.experimental ? '<span class="beta">beta</span>' : ""}</span>`;
-      const sw = document.createElement("button");
-      sw.className = "rd-switch" + (isOn ? " on" : "");
-      sw.disabled = onlyOne;
-      sw.setAttribute("aria-label", `Toggle ${adapter.displayName}`);
-      sw.addEventListener("click", () => {
-        settings.toggle(adapter.sourceKey); // FeedManager reloads itself on change
-        renderSources();
-      });
-      row.appendChild(sw);
-      list.appendChild(row);
+
+    const enabled = ALL_ADAPTERS.filter((a) => settings.isEnabled(a.sourceKey));
+    const available = ALL_ADAPTERS.filter((a) => !settings.isEnabled(a.sourceKey));
+
+    if (enabled.length > 0) {
+      const label = document.createElement("div");
+      label.className = "rd-section-label";
+      label.textContent = "Enabled Sources";
+      list.appendChild(label);
+      for (const adapter of enabled) list.appendChild(_sourceRow(adapter, { withFreq: true }));
+    }
+
+    if (available.length > 0) {
+      const label = document.createElement("div");
+      label.className = "rd-section-label";
+      label.textContent = "Available Sources";
+      list.appendChild(label);
+      for (const adapter of available) list.appendChild(_sourceRow(adapter, { withFreq: false }));
     }
   }
 
@@ -261,6 +394,7 @@
   function setTab(name) {
     activeTab = name;
     tabs.forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+    savedSheet.classList.toggle("open", name === "saved");
     searchSheet.classList.toggle("open", name === "search");
     sourcesSheet.classList.toggle("open", name === "sources");
 
