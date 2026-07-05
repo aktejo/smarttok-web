@@ -29,9 +29,9 @@
   // ---------- Icons ----------
   const ICONS = {
     bookmark: '<svg viewBox="0 0 24 24"><path d="M6 3.5h12a.5.5 0 0 1 .5.5v16.2a.3.3 0 0 1-.47.25L12 16.4l-6.03 4.05a.3.3 0 0 1-.47-.25V4a.5.5 0 0 1 .5-.5z"/></svg>',
+    heart: '<svg viewBox="0 0 24 24"><path d="M12 20.8s-8.2-5-10-9.4C.6 7.8 2.8 4.6 6 4.6c2 0 3.5 1.1 4.4 2.4l1.6 2.1 1.6-2.1c.9-1.3 2.4-2.4 4.4-2.4 3.2 0 5.4 3.2 4 6.8-1.8 4.4-10 9.4-10 9.4z"/></svg>',
     share: '<svg viewBox="0 0 24 24"><path d="M12 3v12M12 3l-4 4M12 3l4 4M5 12v8h14v-8"/></svg>',
     open: '<svg viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8M19 14v5H5V5h5"/></svg>',
-    clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
     home: '<svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>',
     search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>',
     grid: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>',
@@ -67,39 +67,13 @@
     card.className = "rd-card" + (content.media?.url ? " has-media" : "");
     card.dataset.id = content.id;
 
-    // Top bar: source chip + save/share
+    // Top bar: source chip only — actions live in the right-side rail.
     const top = document.createElement("div");
     top.className = "rd-top";
     const chip = document.createElement("div");
     chip.className = "rd-chip";
     chip.innerHTML = `<span class="rd-chip-icon">${sourceMeta?.icon || "•"}</span><span>${sourceName}</span>`;
     top.appendChild(chip);
-
-    const actions = document.createElement("div");
-    actions.className = "rd-top-actions";
-    const saveBtn = document.createElement("button");
-    saveBtn.className = "rd-icon-btn" + (likes.isLiked(content.id) ? " saved" : "");
-    saveBtn.setAttribute("aria-label", "Save");
-    saveBtn.innerHTML = ICONS.bookmark;
-    saveBtn.addEventListener("click", () => {
-      likes.toggle(content);
-      saveBtn.classList.toggle("saved", likes.isLiked(content.id));
-    });
-    actions.appendChild(saveBtn);
-
-    const shareBtn = document.createElement("button");
-    shareBtn.className = "rd-icon-btn";
-    shareBtn.setAttribute("aria-label", "Share");
-    shareBtn.innerHTML = ICONS.share;
-    shareBtn.addEventListener("click", async () => {
-      const payload = { title: content.title || "SmartTok", url: content.openLink || location.href };
-      try {
-        if (navigator.share) await navigator.share(payload);
-        else await navigator.clipboard.writeText(payload.url);
-      } catch (_) { /* user cancelled */ }
-    });
-    actions.appendChild(shareBtn);
-    top.appendChild(actions);
     card.appendChild(top);
 
     if (content.media?.url) {
@@ -145,26 +119,87 @@
       SummaryManager.attach(body, content);
     }
 
+    // Full text, no clamp: if it overflows its region it becomes its own
+    // scroll area (marked .scrollable after measuring in appendCards) with
+    // overscroll containment — so swipes on text scroll the text, while
+    // swipes anywhere else snap to the next card.
     const textEl = document.createElement("div");
     textEl.className = "rd-text";
     textEl.textContent = text;
     body.appendChild(textEl);
-
-    const meta = document.createElement("div");
-    meta.className = "rd-meta";
-    meta.innerHTML = `${ICONS.clock}<span>${readMinutes(text)} min read</span>`;
-    body.appendChild(meta);
     card.appendChild(body);
 
+    // Right-side action rail, reels-style: like / share / open.
+    const rail = document.createElement("div");
+    rail.className = "rd-rail";
+
+    const likeBtn = document.createElement("button");
+    likeBtn.className = "rd-rail-btn" + (likes.isLiked(content.id) ? " saved" : "");
+    likeBtn.setAttribute("aria-label", "Like");
+    likeBtn.innerHTML = ICONS.heart;
+    likeBtn.addEventListener("click", () => {
+      likes.toggle(content);
+      likeBtn.classList.toggle("saved", likes.isLiked(content.id));
+    });
+    rail.appendChild(likeBtn);
+
+    const shareBtn = document.createElement("button");
+    shareBtn.className = "rd-rail-btn";
+    shareBtn.setAttribute("aria-label", "Share");
+    shareBtn.innerHTML = ICONS.share;
+    shareBtn.addEventListener("click", async () => {
+      const payload = { title: content.title || "SmartTok", url: content.openLink || location.href };
+      try {
+        if (navigator.share) await navigator.share(payload);
+        else await navigator.clipboard.writeText(payload.url);
+      } catch (_) { /* user cancelled */ }
+    });
+    rail.appendChild(shareBtn);
+
     if (content.openLink) {
-      const cta = document.createElement("a");
-      cta.className = "rd-cta";
-      cta.href = content.openLink;
-      cta.target = "_blank";
-      cta.rel = "noopener noreferrer";
-      cta.innerHTML = `<span>Read on ${sourceName}</span>${ICONS.open}`;
-      card.appendChild(cta);
+      const openBtn = document.createElement("a");
+      openBtn.className = "rd-rail-btn";
+      openBtn.href = content.openLink;
+      openBtn.target = "_blank";
+      openBtn.rel = "noopener noreferrer";
+      openBtn.setAttribute("aria-label", `Read on ${sourceName}`);
+      openBtn.innerHTML = ICONS.open;
+      rail.appendChild(openBtn);
     }
+    card.appendChild(rail);
+
+    // Double-tap to like (like always, never unlike), with a heart burst.
+    // Manual tap detection so scroll flicks don't count: a tap = small
+    // movement, short press; two taps within 350ms = double-tap.
+    let downX = 0, downY = 0, downT = 0, lastTapT = 0;
+    card.addEventListener("pointerdown", (e) => {
+      downX = e.clientX; downY = e.clientY; downT = Date.now();
+    });
+    card.addEventListener("pointerup", (e) => {
+      if (e.target.closest(".rd-rail")) return;
+      const isTap =
+        Math.hypot(e.clientX - downX, e.clientY - downY) < 12 &&
+        Date.now() - downT < 300;
+      if (!isTap) { lastTapT = 0; return; }
+      const now = Date.now();
+      if (now - lastTapT < 350) {
+        lastTapT = 0;
+        if (!likes.isLiked(content.id)) {
+          likes.toggle(content);
+          likeBtn.classList.add("saved");
+        }
+        const rect = card.getBoundingClientRect();
+        const burst = document.createElement("div");
+        burst.className = "rd-heart-burst";
+        burst.innerHTML = ICONS.heart;
+        burst.style.left = `${e.clientX - rect.left}px`;
+        burst.style.top = `${e.clientY - rect.top}px`;
+        card.appendChild(burst);
+        setTimeout(() => burst.remove(), 750);
+      } else {
+        lastTapT = now;
+      }
+    });
 
     return card;
   }
@@ -184,6 +219,16 @@
     scrollerEl.appendChild(frag);
     renderedCount = feed.items.length;
     observeLastCards();
+
+    // Mark overflowing text regions as their own scroll areas. Only those
+    // get overscroll containment — short texts stay transparent to the
+    // card snap, so swiping on them still advances the feed.
+    requestAnimationFrame(() => {
+      for (const t of scrollerEl.querySelectorAll(".rd-text:not(.measured)")) {
+        t.classList.add("measured");
+        if (t.scrollHeight > t.clientHeight + 4) t.classList.add("scrollable");
+      }
+    });
   }
 
   feed.addEventListener("loading-start", () => {

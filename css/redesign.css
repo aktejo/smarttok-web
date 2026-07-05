@@ -58,6 +58,7 @@ html, body {
   flex-direction: column;
   overflow: hidden;
   padding: 0 22px calc(var(--rd-nav-h) + env(safe-area-inset-bottom) + 10px);
+  touch-action: manipulation; /* no double-tap zoom — double-tap likes instead */
 }
 
 .rd-top {
@@ -82,22 +83,56 @@ html, body {
   color: var(--rd-text-soft);
 }
 .rd-chip .rd-chip-icon { font-size: 0.95rem; line-height: 1; }
-.rd-top-actions { display: flex; gap: 6px; }
-.rd-icon-btn {
-  width: 38px;
-  height: 38px;
+/* ---------- Right-side action rail (reels-style) ---------- */
+.rd-rail {
+  position: absolute;
+  right: 12px;
+  bottom: calc(var(--rd-nav-h) + env(safe-area-inset-bottom) + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 3;
+}
+.rd-rail-btn {
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  border: none;
-  background: transparent;
-  color: var(--rd-text-soft);
+  border: 1px solid var(--rd-hairline);
+  background: rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(10px);
+  color: var(--rd-text);
   display: grid;
   place-items: center;
   cursor: pointer;
+  text-decoration: none;
   -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease;
 }
-.rd-icon-btn:active { background: var(--rd-chip); }
-.rd-icon-btn svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; }
-.rd-icon-btn.saved svg { fill: var(--rd-text); stroke: var(--rd-text); }
+.rd-rail-btn:active { transform: scale(0.9); }
+.rd-rail-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.rd-rail-btn.saved { color: #ff4d67; }
+.rd-rail-btn.saved svg { fill: #ff4d67; stroke: #ff4d67; }
+
+/* Double-tap heart burst */
+.rd-heart-burst {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  animation: rd-burst 0.7s ease-out forwards;
+}
+.rd-heart-burst svg {
+  width: 88px;
+  height: 88px;
+  fill: #ff4d67;
+  stroke: none;
+  filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.45));
+}
+@keyframes rd-burst {
+  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  25%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  55%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -85%) scale(1); opacity: 0; }
+}
 
 /* ---------- Media (image-led cards) ---------- */
 .rd-media {
@@ -176,13 +211,20 @@ html, body {
   font-size: 0.95rem;
   line-height: 1.62;
   color: var(--rd-text-soft);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: var(--rd-clamp, 12);
-  overflow: hidden;
   white-space: pre-line;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-right: 56px; /* keep clear of the action rail */
+  padding-bottom: 10px;
 }
-.rd-card.has-media .rd-text { --rd-clamp: 6; }
+.rd-text.scrollable {
+  overflow-y: auto;
+  overscroll-behavior: contain; /* text swipes never advance the card */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.rd-text.scrollable::-webkit-scrollbar { display: none; }
 
 /* On-device AI one-liner (reuses SummaryManager's .card-simple slot) */
 .card-simple {
@@ -196,39 +238,6 @@ html, body {
   margin: 0 0 12px;
 }
 .card-simple.pending { color: var(--rd-muted); background: transparent; padding: 0 0 12px; }
-
-.rd-meta {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--rd-muted);
-  font-size: 0.8rem;
-  margin-top: auto;
-  padding: 14px 0;
-}
-.rd-meta svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; }
-
-/* ---------- CTA ---------- */
-.rd-cta {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  width: 100%;
-  padding: 15px 18px;
-  border: none;
-  border-radius: 12px;
-  background: var(--rd-accent);
-  color: #fff;
-  font-family: var(--rd-ui);
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-decoration: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.rd-cta:active { background: var(--rd-accent-press); }
-.rd-cta svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
 
 /* ---------- Bottom nav ---------- */
 .rd-nav {

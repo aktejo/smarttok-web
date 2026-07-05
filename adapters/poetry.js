@@ -63,7 +63,12 @@ const PoetryAdapter = {
       sourceKey: this.sourceKey,
       title: poem.title,
       body,
-      openLink: null, // PoetryDB has no human-readable per-poem page
+      // PoetryDB has no human-readable per-poem page, so link to a Poetry
+      // Foundation search for the poem — lands on the real thing for most
+      // of this public-domain corpus.
+      openLink:
+        "https://www.poetryfoundation.org/search?query=" +
+        encodeURIComponent(`${poem.title} ${poem.author || ""}`.trim()),
       media: null,
       attribution: this.displayName,
       tags: poem.author ? [poem.author] : [],
