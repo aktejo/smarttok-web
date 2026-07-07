@@ -139,6 +139,10 @@ main {
   margin-bottom: var(--space-3);
   overflow: hidden;
   animation: card-in 0.35s ease both;
+  /* Skip layout/paint for cards far off-screen — keeps a long feed cheap.
+     The intrinsic-size guess only affects scrollbar estimation. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 480px;
 }
 
 @keyframes card-in {
