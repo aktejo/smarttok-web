@@ -207,11 +207,18 @@ html, body {
   display: block;
   margin: 0 -22px;
   padding: 34px 22px 20px;
+  /* Fill the rest of the card so the backdrop never ends mid-gradient
+     (short captions used to clip it, leaving a translucent band with a
+     hard bottom edge floating over the image). */
+  min-height: 100%;
+  /* The sheet starts at 40dvh and the hero ends at 48dvh, so the fade
+     must be fully solid by 8dvh — stops in dvh keep it aligned with the
+     image's bottom edge at every viewport size (fixed px stops didn't). */
   background: linear-gradient(
     to bottom,
     rgba(8, 8, 10, 0) 0,
-    rgba(8, 8, 10, 0.92) 60px,
-    var(--rd-bg) 120px
+    rgba(8, 8, 10, 0.92) 4dvh,
+    var(--rd-bg) 8dvh
   );
 }
 .rd-card.has-media .rd-text {
