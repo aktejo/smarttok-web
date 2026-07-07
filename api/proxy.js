@@ -114,7 +114,10 @@ export default async function handler(req, res) {
       // caching cuts upstream load from repeat fetches across users. Only
       // full 200s — caching an error body would pin the failure for 60s,
       // and caching a 206 partial could serve a slice to a full request.
-      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+      res.setHeader(
+        "Cache-Control",
+        "public, max-age=60, s-maxage=300, stale-while-revalidate=3600"
+      );
     }
     res.send(body);
   } catch (err) {
