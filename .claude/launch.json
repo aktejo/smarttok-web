@@ -4,8 +4,8 @@
     {
       "name": "smarttok",
       "runtimeExecutable": "vercel",
-      "runtimeArgs": ["dev", "--listen", "3000", "--yes"],
-      "port": 3000
+      "runtimeArgs": ["dev", "--listen", "3001", "--yes"],
+      "port": 3001
     },
     {
       "name": "smarttok-static",
