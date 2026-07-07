@@ -9,6 +9,35 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+
+<!-- Deferred scripts download in parallel while the page parses and run in
+     order once the DOM is ready — same dependency order as before. -->
+<!-- Models & contract -->
+<script defer src="js/models.js"></script>
+<!-- Proxy config (needed by any adapter whose upstream API lacks CORS headers) -->
+<script defer src="js/proxy-config.js"></script>
+<!-- Adapters (register new sources in adapters/index.js) -->
+<script defer src="adapters/wikipedia.js"></script>
+<script defer src="adapters/dogs.js"></script>
+<script defer src="adapters/cats.js"></script>
+<script defer src="adapters/arxiv.js"></script>
+<script defer src="adapters/pubmed.js"></script>
+<script defer src="adapters/nasa.js"></script>
+<script defer src="adapters/poetry.js"></script>
+<script defer src="adapters/gutenberg.js"></script>
+<script defer src="adapters/core.js"></script>
+<script defer src="adapters/index.js"></script>
+<!-- Core logic -->
+<script defer src="js/mixer.js"></script>
+<script defer src="js/settings.js"></script>
+<script defer src="js/likes.js"></script>
+<script defer src="js/history.js"></script>
+<script defer src="js/feed-manager.js"></script>
+<script defer src="js/markdown.js"></script>
+<script defer src="js/summarizer.js"></script>
+<!-- UI -->
+<script defer src="js/card-view.js"></script>
+<script defer src="js/app.js"></script>
 </head>
 <body>
 
@@ -76,37 +105,6 @@
   <button class="lightbox-close" id="lightbox-close">Done</button>
   <img id="lightbox-img" src="" alt="">
 </div>
-
-<!-- Models & contract -->
-<script src="js/models.js"></script>
-
-<!-- Proxy config (needed by any adapter whose upstream API lacks CORS headers) -->
-<script src="js/proxy-config.js"></script>
-
-<!-- Adapters (register new sources in adapters/index.js) -->
-<script src="adapters/wikipedia.js"></script>
-<script src="adapters/dogs.js"></script>
-<script src="adapters/cats.js"></script>
-<script src="adapters/arxiv.js"></script>
-<script src="adapters/pubmed.js"></script>
-<script src="adapters/nasa.js"></script>
-<script src="adapters/poetry.js"></script>
-<script src="adapters/gutenberg.js"></script>
-<script src="adapters/core.js"></script>
-<script src="adapters/index.js"></script>
-
-<!-- Core logic -->
-<script src="js/mixer.js"></script>
-<script src="js/settings.js"></script>
-<script src="js/likes.js"></script>
-<script src="js/history.js"></script>
-<script src="js/feed-manager.js"></script>
-<script src="js/markdown.js"></script>
-<script src="js/summarizer.js"></script>
-
-<!-- UI -->
-<script src="js/card-view.js"></script>
-<script src="js/app.js"></script>
 
 </body>
 </html>

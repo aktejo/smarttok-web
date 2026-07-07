@@ -10,6 +10,27 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/redesign.css">
+
+<!-- Same engine as index.html — only the view layer is different. Deferred:
+     downloads in parallel during parse, runs in order at DOM-ready. -->
+<script defer src="js/models.js"></script>
+<script defer src="js/proxy-config.js"></script>
+<script defer src="adapters/wikipedia.js"></script>
+<script defer src="adapters/dogs.js"></script>
+<script defer src="adapters/cats.js"></script>
+<script defer src="adapters/arxiv.js"></script>
+<script defer src="adapters/pubmed.js"></script>
+<script defer src="adapters/nasa.js"></script>
+<script defer src="adapters/poetry.js"></script>
+<script defer src="adapters/gutenberg.js"></script>
+<script defer src="adapters/core.js"></script>
+<script defer src="adapters/index.js"></script>
+<script defer src="js/mixer.js"></script>
+<script defer src="js/settings.js"></script>
+<script defer src="js/likes.js"></script>
+<script defer src="js/feed-manager.js"></script>
+<script defer src="js/summarizer.js"></script>
+<script defer src="js/redesign-app.js"></script>
 </head>
 <body>
 
@@ -46,26 +67,6 @@
     <button data-tab="sources" data-icon="grid" data-label="Sources"></button>
   </nav>
 </div>
-
-<!-- Same engine as index.html — only the view layer is different -->
-<script src="js/models.js"></script>
-<script src="js/proxy-config.js"></script>
-<script src="adapters/wikipedia.js"></script>
-<script src="adapters/dogs.js"></script>
-<script src="adapters/cats.js"></script>
-<script src="adapters/arxiv.js"></script>
-<script src="adapters/pubmed.js"></script>
-<script src="adapters/nasa.js"></script>
-<script src="adapters/poetry.js"></script>
-<script src="adapters/gutenberg.js"></script>
-<script src="adapters/core.js"></script>
-<script src="adapters/index.js"></script>
-<script src="js/mixer.js"></script>
-<script src="js/settings.js"></script>
-<script src="js/likes.js"></script>
-<script src="js/feed-manager.js"></script>
-<script src="js/summarizer.js"></script>
-<script src="js/redesign-app.js"></script>
 
 </body>
 </html>
