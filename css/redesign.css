@@ -143,6 +143,8 @@ html, body {
   right: 0;
   height: 48dvh;
   z-index: 0;
+  transform-origin: 50% 0; /* minimize toward the top edge on collapse */
+  will-change: transform, opacity;
 }
 .rd-media img {
   width: 100%;

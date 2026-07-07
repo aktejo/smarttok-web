@@ -88,15 +88,16 @@
     top.appendChild(chip);
     card.appendChild(top);
 
+    let mediaEl = null;
     if (content.media?.url) {
-      const media = document.createElement("div");
-      media.className = "rd-media";
+      mediaEl = document.createElement("div");
+      mediaEl.className = "rd-media";
       const img = document.createElement("img");
       img.src = content.media.url;
       img.alt = content.media.alt || "";
       img.loading = "lazy";
-      media.appendChild(img);
-      card.appendChild(media);
+      mediaEl.appendChild(img);
+      card.appendChild(mediaEl);
     }
 
     // body is the scroll container on image cards (the whole inner sheet
@@ -145,6 +146,22 @@
     textEl.textContent = text;
     inner.appendChild(textEl);
     card.appendChild(body);
+
+    // Collapse the hero as the sheet rides up: the image slides upward,
+    // shrinks toward the top edge, and fades out. Transform/opacity only,
+    // so it runs on the compositor.
+    if (mediaEl) {
+      body.addEventListener(
+        "scroll",
+        () => {
+          const y = Math.max(0, body.scrollTop);
+          mediaEl.style.transform =
+            `translateY(${-(y * 0.45)}px) scale(${Math.max(0.86, 1 - y / 900)})`;
+          mediaEl.style.opacity = String(Math.max(0, 1 - y / 440));
+        },
+        { passive: true }
+      );
+    }
 
     // Right-side action rail, reels-style: like / share / open.
     const rail = document.createElement("div");
