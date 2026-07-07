@@ -15,6 +15,14 @@ class HistoryManager {
   constructor() {
     this.entries = this._load(); // array of {content, seenAt}, oldest first
     this.seenIds = new Set(this.entries.map((e) => e.content.id));
+    this._saveTimer = null;
+    // Writes are debounced (record() fires on every card scrolled past, and
+    // serializing 100 full items on the main thread mid-scroll causes jank),
+    // so flush any pending write before the page can go away.
+    addEventListener("pagehide", () => this.flush());
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) this.flush();
+    });
   }
 
   _load() {
@@ -28,11 +36,28 @@ class HistoryManager {
     }
   }
 
+  /** Debounced: coalesces a burst of record() calls into one write. */
   _save() {
+    if (this._saveTimer) return;
+    this._saveTimer = setTimeout(() => {
+      this._saveTimer = null;
+      this._write();
+    }, 500);
+  }
+
+  _write() {
     localStorage.setItem(
       HistoryManager.STORAGE_KEY,
       JSON.stringify(this.entries)
     );
+  }
+
+  /** Write any pending changes now (page is hiding / data must not be lost). */
+  flush() {
+    if (!this._saveTimer) return;
+    clearTimeout(this._saveTimer);
+    this._saveTimer = null;
+    this._write();
   }
 
   hasSeen(id) {
@@ -61,6 +86,10 @@ class HistoryManager {
   clear() {
     this.entries = [];
     this.seenIds.clear();
-    this._save();
+    if (this._saveTimer) {
+      clearTimeout(this._saveTimer);
+      this._saveTimer = null;
+    }
+    this._write(); // user-initiated — persist immediately
   }
 }
