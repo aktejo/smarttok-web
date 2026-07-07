@@ -71,7 +71,11 @@
   function renderFeedAppend(startIndex) {
     const frag = document.createDocumentFragment();
     for (let i = startIndex; i < feed.items.length; i++) {
-      const card = createCardElement(feed.items[i], { likesManager: likes, onImageTap: openLightbox });
+      const card = createCardElement(feed.items[i], {
+        likesManager: likes,
+        onImageTap: openLightbox,
+        eagerImage: i < 2, // first cards are above the fold
+      });
       frag.appendChild(card);
       visibilityObserver.observe(card);
     }
@@ -90,29 +94,29 @@
     }
   }
 
-  let initialLoadInProgress = false;
+  let lastRenderedCount = 0;
 
   feed.addEventListener("loading-start", () => {
-    initialLoadInProgress = true;
     visibilityObserver.disconnect(); // drop observations of cards about to be removed
     feedListEl.innerHTML = "";
+    lastRenderedCount = 0;
     showSkeletons(3);
   });
 
-  let lastRenderedCount = 0;
-  feed.addEventListener("loaded-initial", () => {
-    initialLoadInProgress = false;
-    clearSkeletons();
-    lastRenderedCount = 0;
-    renderFeedAppend(0);
-    lastRenderedCount = feed.items.length;
-    hideRefreshIndicator();
-  });
-
+  // Fires per source as each resolves — the first cards paint as soon as the
+  // fastest source answers, while slower sources keep appending below.
   feed.addEventListener("loaded-more", () => {
-    if (initialLoadInProgress) return; // loaded-initial will render the full batch
+    if (feed.items.length <= lastRenderedCount) return;
+    clearSkeletons();
     renderFeedAppend(lastRenderedCount);
     lastRenderedCount = feed.items.length;
+  });
+
+  feed.addEventListener("loaded-initial", () => {
+    clearSkeletons();
+    renderFeedAppend(lastRenderedCount);
+    lastRenderedCount = feed.items.length;
+    hideRefreshIndicator();
   });
 
   // ---------- Infinite scroll ----------

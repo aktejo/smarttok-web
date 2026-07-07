@@ -4,7 +4,7 @@
  * Display rule (matches iOS): only title + body render as content.
  * Everything else powers actions (like, open, fullscreen image).
  */
-function createCardElement(content, { likesManager, onImageTap }) {
+function createCardElement(content, { likesManager, onImageTap, eagerImage = false }) {
   const card = document.createElement("article");
   card.className = "card" + (content.tags?.includes("error") ? " is-error" : "");
   card.dataset.id = content.id;
@@ -23,7 +23,11 @@ function createCardElement(content, { likesManager, onImageTap }) {
     const img = document.createElement("img");
     img.src = content.media.url;
     img.alt = content.media.alt || "";
-    img.loading = "lazy";
+    // Above-the-fold images (the feed's first cards) fetch at full priority;
+    // everything below stays lazy.
+    img.loading = eagerImage ? "eager" : "lazy";
+    if (eagerImage) img.fetchPriority = "high";
+    img.decoding = "async";
     mediaWrap.appendChild(img);
     mediaWrap.addEventListener("click", () => onImageTap(content.media.url, content.media.alt));
     card.appendChild(mediaWrap);

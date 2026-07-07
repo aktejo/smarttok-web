@@ -64,7 +64,7 @@
     return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
   }
 
-  function createRedesignCard(content) {
+  function createRedesignCard(content, eagerImage = false) {
     const sourceMeta = ADAPTERS_BY_KEY[content.sourceKey];
     const { text, byline } = splitByline(content.body || "");
     const isPaper = !!sourceMeta?.simplify;
@@ -95,7 +95,11 @@
       const img = document.createElement("img");
       img.src = content.media.url;
       img.alt = content.media.alt || "";
-      img.loading = "lazy";
+      // The first on-screen card's hero is the LCP element — fetch it at
+      // full priority; everything below the fold stays lazy.
+      img.loading = eagerImage ? "eager" : "lazy";
+      if (eagerImage) img.fetchPriority = "high";
+      img.decoding = "async";
       mediaEl.appendChild(img);
       card.appendChild(mediaEl);
     }
@@ -245,10 +249,12 @@
 
   function appendCards(fromIndex) {
     const frag = document.createDocumentFragment();
+    let eagerNext = !scrollerEl.querySelector(".rd-card"); // first visible card
     for (let i = fromIndex; i < feed.items.length; i++) {
       const item = feed.items[i];
       if (item.tags?.includes("error")) continue; // no fullscreen error cards
-      frag.appendChild(createRedesignCard(item));
+      frag.appendChild(createRedesignCard(item, eagerNext));
+      eagerNext = false;
     }
     scrollerEl.appendChild(frag);
     renderedCount = feed.items.length;
@@ -291,19 +297,24 @@
     showState('<div class="rd-spinner"></div><div>Loading the good stuff…</div>');
   });
 
-  feed.addEventListener("loaded-initial", () => {
-    if (activeTab !== "today") return;
-    scrollerEl.innerHTML = "";
-    appendCards(0);
-    if (!scrollerEl.children.length) {
-      showState("Nothing loaded — check your connection and pull this tab again.");
-    }
-  });
-
+  // Fires per source as each resolves — the first card paints as soon as the
+  // fastest source answers instead of waiting out the slowest one.
   feed.addEventListener("loaded-more", () => {
     if (activeTab !== "today") return;
-    if (scrollerEl.querySelector(".rd-state")) return; // initial render owns the reset
+    if (scrollerEl.querySelector(".rd-state")) {
+      // Spinner still up: only swap it out once something renderable arrived
+      // (error items are skipped on this fullscreen UI).
+      if (!feed.items.slice(renderedCount).some((i) => !i.tags?.includes("error"))) return;
+      scrollerEl.innerHTML = "";
+    }
     appendCards(renderedCount);
+  });
+
+  feed.addEventListener("loaded-initial", () => {
+    if (activeTab !== "today") return;
+    if (!scrollerEl.querySelector(".rd-card")) {
+      showState("Nothing loaded — check your connection and pull this tab again.");
+    }
   });
 
   // Infinite scroll: when one of the last two cards is on screen, fetch more.
