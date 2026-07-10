@@ -135,13 +135,16 @@ html, body {
 }
 
 /* ---------- Media (image-led cards) ----------
-   The image is pinned behind the card; the body sheet scrolls up over it. */
+   The image is a full-bleed 100dvh backdrop pinned behind the card. At rest
+   the sheet covers everything below ~40dvh; scrolling the text up collapses
+   the hero, and on scrollable cards pulling DOWN past the top slides the
+   sheet away and reveals the image fullscreen (see .rd-expand-spacer). */
 .rd-media {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 48dvh;
+  height: 100dvh;
   z-index: 0;
   transform-origin: 50% 0; /* minimize toward the top edge on collapse */
   /* No static will-change here: the scroll handler applies it only while
@@ -154,16 +157,17 @@ html, body {
   object-fit: cover;
   display: block;
 }
+/* Top scrim only, for chip legibility. No bottom fade: the caption fade
+   comes from the sheet's own gradient, and a baked-in bottom fade would
+   darken the lower half of the image in the fullscreen state. */
 .rd-media::after {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(8, 8, 10, 0.55) 0%,
-    rgba(8, 8, 10, 0) 22%,
-    rgba(8, 8, 10, 0) 55%,
-    var(--rd-bg) 100%
+    rgba(8, 8, 10, 0.55) 0,
+    rgba(8, 8, 10, 0) 12dvh
   );
 }
 /* Pull the top bar over the image */
@@ -196,26 +200,51 @@ html, body {
 .rd-card.has-media .rd-body {
   padding-top: 40dvh;
   overflow: hidden;
-  /* Full card width: the body is an overflow container, so anything that
-     should paint edge-to-edge (the sheet's gradient backdrop) must fit
-     INSIDE it — negative margins on children get clipped, which used to
-     leave two bright un-darkened strips of image beside the text. */
-  margin: 0 -22px;
+  /* Full card width AND full card height: the body is an overflow
+     container, so anything that should paint edge-to-edge (the sheet's
+     gradient backdrop) must fit INSIDE it — negative margins on children
+     get clipped, which used to leave bright un-darkened strips of image
+     beside the text. The negative bottom margin reaches past the card's
+     nav padding so the sheet also covers the 100dvh hero's bottom strip
+     at rest (the nav itself is translucent and fixed above). */
+  margin: 0 -22px calc(-1 * (var(--rd-nav-h) + env(safe-area-inset-bottom) + 10px));
 }
 .rd-card.has-media .rd-body.scrollable {
   overflow-y: auto;
   overscroll-behavior: contain; /* reading never yanks to the next card */
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  /* Two soft snap points — fullscreen image (spacer start) and the resting
+     sheet (inner start) — with free scrolling once you're into the text. */
+  scroll-snap-type: y proximity;
+  scroll-padding-top: 40dvh;
 }
 .rd-card.has-media .rd-body.scrollable::-webkit-scrollbar { display: none; }
+
+/* Expansion headroom above the sheet: 60dvh of scroll room on scrollable
+   cards, so pulling down past the sheet's top slides it off-screen and the
+   full-bleed hero becomes fullscreen. Zero-height on non-scrollable cards,
+   which keeps short-caption cards transparent to the outer snap scroller. */
+.rd-expand-spacer {
+  height: 0;
+  flex: none;
+}
+.rd-card.has-media .rd-body.scrollable .rd-expand-spacer {
+  height: 60dvh;
+  scroll-snap-align: start; /* snap here = fullscreen image */
+}
+.rd-card.has-media .rd-body.scrollable .rd-body-inner {
+  scroll-snap-align: start; /* snap here = resting sheet at 40dvh */
+}
 .rd-card.has-media .rd-body-inner {
   flex: none;
   display: block;
   /* No negative margin here: the body clips it (see above). The 22px text
-     inset comes from this padding instead. */
+     inset comes from this padding; the bottom padding keeps the last line
+     of text readable above the (translucent, fixed) nav bar now that the
+     body extends underneath it. */
   margin: 0;
-  padding: 34px 22px 20px;
+  padding: 34px 22px calc(20px + var(--rd-nav-h) + env(safe-area-inset-bottom) + 10px);
   /* Fill the rest of the card so the backdrop never ends mid-gradient
      (short captions used to clip it, leaving a translucent band with a
      hard bottom edge floating over the image). */

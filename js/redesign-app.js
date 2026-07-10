@@ -108,6 +108,16 @@
     // rides up over the fixed hero image); on text cards .rd-text scrolls.
     const body = document.createElement("div");
     body.className = "rd-body";
+    // Expansion headroom (media cards): scroll room ABOVE the sheet so
+    // pulling down past the top reveals the hero fullscreen. Height comes
+    // from CSS (60dvh once the body is marked .scrollable, else 0), and
+    // appendCards starts the body scrolled to the sheet's resting point.
+    let spacerEl = null;
+    if (content.media?.url) {
+      spacerEl = document.createElement("div");
+      spacerEl.className = "rd-expand-spacer";
+      body.appendChild(spacerEl);
+    }
     const inner = document.createElement("div");
     inner.className = "rd-body-inner";
     body.appendChild(inner);
@@ -164,7 +174,10 @@
       let idleTimer = 0;
       const applyCollapse = () => {
         rafId = 0;
-        const y = Math.max(0, body.scrollTop);
+        // y is relative to the sheet's REST position: the first
+        // spacer-height pixels of scroll are the fullscreen-image zone,
+        // where the hero stays untransformed and the sheet does the moving.
+        const y = Math.max(0, body.scrollTop - spacerEl.offsetHeight);
         mediaEl.style.transform =
           `translateY(${-(y * 0.45)}px) scale(${Math.max(0.86, 1 - y / 900)})`;
         mediaEl.style.opacity = String(Math.max(0, 1 - y / 440));
@@ -287,6 +300,11 @@
           : cardEl.querySelector(".rd-text");
         if (target && target.scrollHeight > target.clientHeight + 4) {
           target.classList.add("scrollable");
+          // Media cards gain 60dvh of expansion headroom above the sheet
+          // once scrollable — start them at the sheet's resting point
+          // (fullscreen image is one pull-down away, snap-assisted).
+          const spacer = target.querySelector(".rd-expand-spacer");
+          if (spacer) target.scrollTop = spacer.offsetHeight;
         }
         seenObserver.observe(cardEl);
       }
