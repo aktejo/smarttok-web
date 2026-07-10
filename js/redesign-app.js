@@ -176,6 +176,9 @@
         mediaEl.style.transform =
           `translateY(${-(y * 0.45)}px) scale(${Math.max(0.86, 1 - y / 900)})`;
         mediaEl.style.opacity = String(Math.max(0, 1 - y / 440));
+        // Once the sheet reaches the top, the sticky pill is pinned over
+        // scrolling text — give it a contrast treatment so it stays visible.
+        grabEl.classList.toggle("pinned", y > card.clientHeight * 0.4 - 30);
       };
       body.addEventListener(
         "scroll",
@@ -267,8 +270,14 @@
 
       let drag = null;
       grabEl.addEventListener("pointerdown", (e) => {
-        if (expandP === 0 && body.scrollTop > 2) return; // pill acts from rest
         cancelAnimationFrame(settleRaf);
+        // Mid-read the pill is pinned (sticky) at the top of the screen:
+        // there, a pull-down (or tap) means "bring the sheet back down".
+        if (expandP === 0 && body.scrollTop > 2) {
+          drag = { y0: e.clientY, returnMode: true };
+          try { grabEl.setPointerCapture(e.pointerId); } catch (_) { /* synthetic pointer */ }
+          return;
+        }
         if (!geom || expandP === 0) geom = computeGeom();
         // Sanity gate: mid-layout (rotation, viewport churn) the measured
         // geometry can be degenerate — refuse the gesture rather than
@@ -278,13 +287,26 @@
         try { grabEl.setPointerCapture(e.pointerId); } catch (_) { /* synthetic pointer */ }
       });
       grabEl.addEventListener("pointermove", (e) => {
-        if (!drag || !geom.dist) return;
+        if (!drag) return;
+        if (drag.returnMode) {
+          if (e.clientY - drag.y0 > 24) {
+            drag = null;
+            body.scrollTo({ top: 0, behavior: "smooth" });
+          }
+          return;
+        }
+        if (!geom.dist) return;
         const dy = e.clientY - drag.y0;
         if (Math.abs(dy) > 4) drag.moved = true;
         setExpand(Math.min(1, Math.max(0, drag.p0 + dy / geom.dist)));
       });
       const endDrag = () => {
         if (!drag) return;
+        if (drag.returnMode) {
+          drag = null;
+          body.scrollTo({ top: 0, behavior: "smooth" }); // tap = same intent
+          return;
+        }
         const target = !drag.moved
           ? (drag.p0 > 0.5 ? 0 : 1) // a plain tap toggles
           : drag.p0 === 0

@@ -200,16 +200,23 @@ html, body {
 /* Image cards: the body is the scroll container and the inner sheet —
    with its own fade-to-solid backdrop — rides up over the pinned image. */
 .rd-card.has-media .rd-body {
-  /* margin-top (NOT padding-top): the body's box starts at 40dvh, so the
-     image area above it belongs to the card — swipes there drive the
-     outer snap scroller (card navigation) instead of scrolling the text. */
-  margin: 40dvh -22px 0;
+  /* The scroll canvas spans the FULL card, so the sheet scrolls all the
+     way to the top of the screen (clipping it at 40dvh left a floating
+     "black box" of clipped text over the collapsed hero). The sheet's
+     40dvh rest offset is the inner's top margin, and pointer-events:none
+     makes the empty area above it transparent to hit-testing — swipes on
+     the image / rail still drive the outer snap scroller (card
+     navigation); only touches on the sheet itself scroll the text. */
+  padding-top: 0;
+  margin: 0 -22px;
   overflow: hidden;
+  pointer-events: none;
   /* Full card width: the body is an overflow container, so anything that
      should paint edge-to-edge (the sheet's gradient backdrop) must fit
      INSIDE it — negative margins on children get clipped, which used to
      leave bright un-darkened strips of image beside the text. */
 }
+.rd-card.has-media .rd-body-inner { pointer-events: auto; }
 .rd-card.has-media .rd-body.scrollable {
   overflow-y: auto;
   overscroll-behavior: contain; /* reading never yanks to the next card */
@@ -234,7 +241,9 @@ html, body {
 }
 
 /* Grab pill at the top of the sheet on image cards: drag it down to
-   minimize the text and expand the photo; drag up (or tap) to restore. */
+   minimize the text and expand the photo; drag up (or tap) to restore.
+   Sticky: while the sheet scrolls up for reading, the pill pins near the
+   top of the screen and the title/text scroll away underneath it. */
 .rd-grab {
   display: flex;
   justify-content: center;
@@ -242,6 +251,9 @@ html, body {
   margin-top: -14px;
   cursor: grab;
   touch-action: none; /* the drag owns this surface; no native scrolling */
+  position: sticky;
+  top: 8px;
+  z-index: 2;
 }
 .rd-grab::before {
   content: "";
@@ -250,17 +262,29 @@ html, body {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.32);
 }
+/* Pinned over scrolling text (class toggled by the scroll handler): a soft
+   dark fade keeps the pill legible without touching the resting look. */
+.rd-grab.pinned {
+  background: linear-gradient(to bottom, rgba(8, 8, 10, 0.85), rgba(8, 8, 10, 0));
+}
+.rd-grab.pinned::before {
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
 .rd-card.has-media .rd-body-inner {
   flex: none;
   display: block;
-  /* No negative margin here: the body clips it (see above). The 22px text
-     inset comes from this padding instead. */
-  margin: 0;
+  /* The 40dvh rest offset lives HERE (top margin inside the full-card
+     scroll canvas), so scrolling carries the whole sheet — pill, title,
+     text — all the way to the top of the screen. No negative horizontal
+     margin: the body clips it (see above); the 22px text inset comes from
+     this padding instead. */
+  margin: 40dvh 0 0;
   padding: 34px 22px 20px;
   /* Fill the rest of the card so the backdrop never ends mid-gradient
      (short captions used to clip it, leaving a translucent band with a
      hard bottom edge floating over the image). */
-  min-height: 100%;
+  min-height: calc(100% - 40dvh);
   /* The sheet starts at 40dvh and the hero ends at 48dvh, so the fade
      must be fully solid by 8dvh — stops in dvh keep it aligned with the
      image's bottom edge at every viewport size (fixed px stops didn't). */
