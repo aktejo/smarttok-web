@@ -153,15 +153,29 @@
 
     // Collapse the hero as the sheet rides up: the image slides upward,
     // shrinks toward the top edge, and fades out. Transform/opacity only,
-    // so it runs on the compositor.
+    // so it runs on the compositor. Two jank guards:
+    //   - updates are coalesced to one style write per frame (rAF), so a
+    //     burst of scroll events can't stack redundant main-thread work;
+    //   - will-change is applied only while actively animating — a static
+    //     will-change on every hero kept a GPU layer alive per image card,
+    //     which piled up under infinite scroll and made the collapse lag.
     if (mediaEl) {
+      let rafId = 0;
+      let idleTimer = 0;
+      const applyCollapse = () => {
+        rafId = 0;
+        const y = Math.max(0, body.scrollTop);
+        mediaEl.style.transform =
+          `translateY(${-(y * 0.45)}px) scale(${Math.max(0.86, 1 - y / 900)})`;
+        mediaEl.style.opacity = String(Math.max(0, 1 - y / 440));
+      };
       body.addEventListener(
         "scroll",
         () => {
-          const y = Math.max(0, body.scrollTop);
-          mediaEl.style.transform =
-            `translateY(${-(y * 0.45)}px) scale(${Math.max(0.86, 1 - y / 900)})`;
-          mediaEl.style.opacity = String(Math.max(0, 1 - y / 440));
+          mediaEl.style.willChange = "transform, opacity";
+          clearTimeout(idleTimer);
+          idleTimer = setTimeout(() => { mediaEl.style.willChange = ""; }, 200);
+          if (!rafId) rafId = requestAnimationFrame(applyCollapse);
         },
         { passive: true }
       );

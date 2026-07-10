@@ -144,7 +144,9 @@ html, body {
   height: 48dvh;
   z-index: 0;
   transform-origin: 50% 0; /* minimize toward the top edge on collapse */
-  will-change: transform, opacity;
+  /* No static will-change here: the scroll handler applies it only while
+     the collapse is actively animating. A permanent hint kept one GPU
+     layer alive per image card, which accumulates under infinite scroll. */
 }
 .rd-media img {
   width: 100%;
