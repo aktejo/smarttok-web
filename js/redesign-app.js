@@ -108,19 +108,18 @@
     // rides up over the fixed hero image); on text cards .rd-text scrolls.
     const body = document.createElement("div");
     body.className = "rd-body";
-    // Expansion headroom (media cards): scroll room ABOVE the sheet so
-    // pulling down past the top reveals the hero fullscreen. Height comes
-    // from CSS (60dvh once the body is marked .scrollable, else 0), and
-    // appendCards starts the body scrolled to the sheet's resting point.
-    let spacerEl = null;
-    if (content.media?.url) {
-      spacerEl = document.createElement("div");
-      spacerEl.className = "rd-expand-spacer";
-      body.appendChild(spacerEl);
-    }
     const inner = document.createElement("div");
     inner.className = "rd-body-inner";
     body.appendChild(inner);
+
+    // Grab pill (image cards): the handle for the expand/minimize gesture.
+    let grabEl = null;
+    if (mediaEl) {
+      grabEl = document.createElement("div");
+      grabEl.className = "rd-grab";
+      grabEl.setAttribute("aria-label", "Expand image");
+      inner.appendChild(grabEl);
+    }
 
     if (content.title) {
       const h1 = document.createElement("h1");
@@ -161,23 +160,19 @@
     inner.appendChild(textEl);
     card.appendChild(body);
 
-    // Collapse the hero as the sheet rides up: the image slides upward,
-    // shrinks toward the top edge, and fades out. Transform/opacity only,
-    // so it runs on the compositor. Two jank guards:
-    //   - updates are coalesced to one style write per frame (rAF), so a
-    //     burst of scroll events can't stack redundant main-thread work;
-    //   - will-change is applied only while actively animating — a static
-    //     will-change on every hero kept a GPU layer alive per image card,
-    //     which piled up under infinite scroll and made the collapse lag.
+    // ---- Image-card gestures ----
     if (mediaEl) {
+      const img = mediaEl.querySelector("img");
+
+      // (1) Collapse the hero as the sheet rides up: the image slides
+      // upward, shrinks toward the top edge, and fades out. rAF-coalesced;
+      // will-change only while animating (a static hint per card piles up
+      // GPU layers under infinite scroll).
       let rafId = 0;
       let idleTimer = 0;
       const applyCollapse = () => {
         rafId = 0;
-        // y is relative to the sheet's REST position: the first
-        // spacer-height pixels of scroll are the fullscreen-image zone,
-        // where the hero stays untransformed and the sheet does the moving.
-        const y = Math.max(0, body.scrollTop - spacerEl.offsetHeight);
+        const y = Math.max(0, body.scrollTop);
         mediaEl.style.transform =
           `translateY(${-(y * 0.45)}px) scale(${Math.max(0.86, 1 - y / 900)})`;
         mediaEl.style.opacity = String(Math.max(0, 1 - y / 440));
@@ -192,6 +187,153 @@
         },
         { passive: true }
       );
+
+      // (2) Expand: dragging the grab pill down parks the sheet at the
+      // bottom (just the title, or the first caption line) and morphs the
+      // hero from its 48dvh cover-crop preview to a letterboxed box at the
+      // image's OWN aspect ratio — a cover-fit box AT the image's ratio
+      // crops nothing, so the crop melts away as the box approaches it.
+      let expandP = 0;   // 0 = rest, 1 = fullscreen image
+      let geom = null;   // gesture geometry, computed at drag start
+      let settleRaf = 0;
+
+      const computeGeom = () => {
+        const ch = card.clientHeight;
+        const cw = card.clientWidth;
+        const innerTop = inner.getBoundingClientRect().top;
+        // Visible strip in the expanded state: pill + title, or pill +
+        // first line of the caption on title-less cards (cats/dogs).
+        const titleEl = inner.querySelector(".rd-title");
+        const stripBottom = titleEl
+          ? titleEl.getBoundingClientRect().bottom
+          : textEl.getBoundingClientRect().top +
+            (parseFloat(getComputedStyle(textEl).lineHeight) || 24);
+        const stripH = stripBottom - innerTop + 14;
+        // Park the strip just above the nav bar, not behind it: the card's
+        // bottom padding is exactly the nav allowance.
+        const navPad = parseFloat(getComputedStyle(card).paddingBottom) || 0;
+        const availH = Math.max(120, ch - navPad - stripH);
+        const nw = img.naturalWidth || cw;
+        const nh = img.naturalHeight || availH;
+        const k = Math.min(cw / nw, availH / nh);
+        return {
+          h0: mediaEl.offsetHeight,           // the 48dvh preview height
+          fitH: nh * k,
+          fitTop: (availH - nh * k) / 2,
+          side: (cw - nw * k) / 2,
+          // sheet rests at 40dvh = 0.4*ch
+          dist: Math.max(0, ch * 0.6 - navPad - stripH),
+        };
+      };
+
+      const setExpand = (p) => {
+        expandP = p;
+        if (p <= 0) {
+          // Fully back to rest: clear inline geometry so the pure-CSS
+          // preview (and future viewport resizes) win again.
+          mediaEl.style.height = "";
+          mediaEl.style.top = "";
+          mediaEl.style.left = "";
+          mediaEl.style.right = "";
+          mediaEl.style.removeProperty("--rd-scrim-o");
+          body.style.transform = "";
+          card.classList.remove("rd-expanded");
+          return;
+        }
+        const g = geom;
+        const lerp = (a, b) => a + (b - a) * p;
+        mediaEl.style.height = `${lerp(g.h0, g.fitH)}px`;
+        mediaEl.style.top = `${lerp(0, g.fitTop)}px`;
+        mediaEl.style.left = `${lerp(0, g.side)}px`;
+        mediaEl.style.right = `${lerp(0, g.side)}px`;
+        mediaEl.style.setProperty("--rd-scrim-o", String(1 - p));
+        body.style.transform = `translateY(${lerp(0, g.dist)}px)`;
+        card.classList.toggle("rd-expanded", p >= 1);
+      };
+
+      const settleTo = (target) => {
+        cancelAnimationFrame(settleRaf);
+        const from = expandP;
+        const t0 = performance.now();
+        const DUR = 220;
+        const tick = (now) => {
+          const t = Math.min(1, (now - t0) / DUR);
+          const e = 1 - Math.pow(1 - t, 3); // ease-out cubic
+          setExpand(from + (target - from) * e);
+          if (t < 1) settleRaf = requestAnimationFrame(tick);
+        };
+        settleRaf = requestAnimationFrame(tick);
+      };
+
+      let drag = null;
+      grabEl.addEventListener("pointerdown", (e) => {
+        if (expandP === 0 && body.scrollTop > 2) return; // pill acts from rest
+        cancelAnimationFrame(settleRaf);
+        if (!geom || expandP === 0) geom = computeGeom();
+        // Sanity gate: mid-layout (rotation, viewport churn) the measured
+        // geometry can be degenerate — refuse the gesture rather than
+        // expanding into a broken state.
+        if (!(geom.dist > 40) || !(geom.fitH > 60)) { geom = null; return; }
+        drag = { y0: e.clientY, p0: expandP, moved: false };
+        try { grabEl.setPointerCapture(e.pointerId); } catch (_) { /* synthetic pointer */ }
+      });
+      grabEl.addEventListener("pointermove", (e) => {
+        if (!drag || !geom.dist) return;
+        const dy = e.clientY - drag.y0;
+        if (Math.abs(dy) > 4) drag.moved = true;
+        setExpand(Math.min(1, Math.max(0, drag.p0 + dy / geom.dist)));
+      });
+      const endDrag = () => {
+        if (!drag) return;
+        const target = !drag.moved
+          ? (drag.p0 > 0.5 ? 0 : 1) // a plain tap toggles
+          : drag.p0 === 0
+            ? (expandP > 0.25 ? 1 : 0)
+            : (expandP < 0.75 ? 0 : 1);
+        drag = null;
+        settleTo(target);
+      };
+      grabEl.addEventListener("pointerup", endDrag);
+      grabEl.addEventListener("pointercancel", endDrag);
+
+      // (3) Pinch-to-zoom on the expanded image, Instagram-style: zooms
+      // while the fingers are down, springs back to fit on release.
+      let pinch = null;
+      mediaEl.addEventListener("touchstart", (e) => {
+        if (expandP < 0.99 || e.touches.length !== 2) return;
+        const [a, b] = e.touches;
+        const r = mediaEl.getBoundingClientRect();
+        pinch = {
+          d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+          mx: (a.clientX + b.clientX) / 2,
+          my: (a.clientY + b.clientY) / 2,
+        };
+        img.style.transformOrigin =
+          `${pinch.mx - r.left}px ${pinch.my - r.top}px`;
+        img.style.transition = "none";
+      }, { passive: true });
+      mediaEl.addEventListener("touchmove", (e) => {
+        if (!pinch || e.touches.length !== 2) return;
+        e.preventDefault(); // this gesture is ours — no page pan/zoom
+        const [a, b] = e.touches;
+        const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        const s = Math.min(4, Math.max(1, d / pinch.d0));
+        const mx = (a.clientX + b.clientX) / 2;
+        const my = (a.clientY + b.clientY) / 2;
+        img.style.transform =
+          `translate(${mx - pinch.mx}px, ${my - pinch.my}px) scale(${s})`;
+      }, { passive: false });
+      const endPinch = () => {
+        if (!pinch) return;
+        pinch = null;
+        img.style.transition = "transform 0.25s ease";
+        img.style.transform = "";
+        setTimeout(() => { img.style.transition = ""; }, 300);
+      };
+      mediaEl.addEventListener("touchend", (e) => {
+        if (e.touches.length < 2) endPinch();
+      }, { passive: true });
+      mediaEl.addEventListener("touchcancel", endPinch, { passive: true });
     }
 
     // Right-side action rail, reels-style: like / share / open.
@@ -300,11 +442,6 @@
           : cardEl.querySelector(".rd-text");
         if (target && target.scrollHeight > target.clientHeight + 4) {
           target.classList.add("scrollable");
-          // Media cards gain 60dvh of expansion headroom above the sheet
-          // once scrollable — start them at the sheet's resting point
-          // (fullscreen image is one pull-down away, snap-assisted).
-          const spacer = target.querySelector(".rd-expand-spacer");
-          if (spacer) target.scrollTop = spacer.offsetHeight;
         }
         seenObserver.observe(cardEl);
       }
