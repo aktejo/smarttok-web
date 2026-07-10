@@ -194,6 +194,11 @@ html, body {
 .rd-card.has-media .rd-body {
   padding-top: 40dvh;
   overflow: hidden;
+  /* Full card width: the body is an overflow container, so anything that
+     should paint edge-to-edge (the sheet's gradient backdrop) must fit
+     INSIDE it — negative margins on children get clipped, which used to
+     leave two bright un-darkened strips of image beside the text. */
+  margin: 0 -22px;
 }
 .rd-card.has-media .rd-body.scrollable {
   overflow-y: auto;
@@ -205,7 +210,9 @@ html, body {
 .rd-card.has-media .rd-body-inner {
   flex: none;
   display: block;
-  margin: 0 -22px;
+  /* No negative margin here: the body clips it (see above). The 22px text
+     inset comes from this padding instead. */
+  margin: 0;
   padding: 34px 22px 20px;
   /* Fill the rest of the card so the backdrop never ends mid-gradient
      (short captions used to clip it, leaving a translucent band with a
