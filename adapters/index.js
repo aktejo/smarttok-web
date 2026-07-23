@@ -12,6 +12,8 @@ const ALL_ADAPTERS = [
   NasaAdapter,
   PoetryAdapter,
   GutenbergAdapter,
+  PhilosophyAdapter,
+  EconomicsAdapter,
   CoreAdapter,
   // ComicsAdapter,     <- load adapters/comics.js + add here
 ];
