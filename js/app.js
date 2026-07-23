@@ -68,6 +68,38 @@
     { threshold: 0.6 } // at least 60% of the card must be on screen to count as "seen"
   );
 
+  // Dwell tracking for the interest algorithm: how long each card stays
+  // ≥60% on screen. Enter stamps a start time; exit reports the duration
+  // (a fast flick registers as a skip inside recordDwell).
+  const dwellStart = new Map(); // element -> timestamp
+  const dwellObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        const content = feed.items.find((i) => i.id === entry.target.dataset.id);
+        if (!content || content.tags?.includes("error")) continue;
+        if (entry.isIntersecting) {
+          if (!dwellStart.has(entry.target)) {
+            dwellStart.set(entry.target, performance.now());
+            AffinityManager.recordShown(content);
+          }
+        } else if (dwellStart.has(entry.target)) {
+          const ms = performance.now() - dwellStart.get(entry.target);
+          dwellStart.delete(entry.target);
+          AffinityManager.recordDwell(content, ms);
+        }
+      }
+    },
+    { threshold: 0.6 }
+  );
+  // Card still on screen when the page goes away = a real read; don't lose it.
+  addEventListener("pagehide", () => {
+    for (const [el, start] of dwellStart) {
+      const content = feed.items.find((i) => i.id === el.dataset.id);
+      if (content) AffinityManager.recordDwell(content, performance.now() - start);
+    }
+    dwellStart.clear();
+  });
+
   function renderFeedAppend(startIndex) {
     const frag = document.createDocumentFragment();
     for (let i = startIndex; i < feed.items.length; i++) {
@@ -78,6 +110,7 @@
       });
       frag.appendChild(card);
       visibilityObserver.observe(card);
+      dwellObserver.observe(card);
     }
     feedListEl.appendChild(frag);
   }
@@ -98,6 +131,8 @@
 
   feed.addEventListener("loading-start", () => {
     visibilityObserver.disconnect(); // drop observations of cards about to be removed
+    dwellObserver.disconnect();
+    dwellStart.clear();
     feedListEl.innerHTML = "";
     lastRenderedCount = 0;
     showSkeletons(3);

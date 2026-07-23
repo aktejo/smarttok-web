@@ -35,13 +35,18 @@ class LikesManager extends EventTarget {
   }
 
   toggle(content) {
-    if (this.items.has(content.id)) {
-      this.items.delete(content.id);
-    } else {
+    const liked = !this.items.has(content.id);
+    if (liked) {
       this.items.set(content.id, { content, likedAt: new Date().toISOString() });
+    } else {
+      this.items.delete(content.id);
     }
     this._save();
-    this.dispatchEvent(new CustomEvent("change"));
+    // Saves are the strongest interest signal for the educational feed.
+    if (typeof AffinityManager !== "undefined") {
+      AffinityManager.recordSave(content, liked);
+    }
+    this.dispatchEvent(new CustomEvent("change", { detail: { content, liked } }));
   }
 
   getAllSortedNewestFirst() {
