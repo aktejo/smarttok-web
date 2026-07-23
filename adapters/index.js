@@ -13,6 +13,7 @@ const ALL_ADAPTERS = [
   PoetryAdapter,
   GutenbergAdapter,
   WikiEduAdapter,
+  WordPhilAdapter,
   CoreAdapter,
   // ComicsAdapter,     <- load adapters/comics.js + add here
 ];

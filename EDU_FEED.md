@@ -77,9 +77,24 @@ Build order:
 1. **OpenStax** (Biology 2e, Principles of Economics, American Government,
    Intro to Political Science) — CC BY, diagram-rich, sections map cleanly to
    cards. Process the books once into a static manifest rather than scraping
-   at runtime. Check current terms re: AI/LLM use.
-2. **1000-Word Philosophy** — already card-sized. CC BY-NC: flag
-   non-commercial in the manifest.
+   at runtime. Check current terms re: AI/LLM use. *(Not built yet. Probed
+   2026-07: the CMS API — `openstax.org/apps/cms/api/v2/pages/` — is
+   CORS-friendly and lists all four target books; content is reachable for a
+   manifest build.)*
+2. **1000-Word Philosophy** — ✅ **DONE** (`adapters/wordphil.js`, source #11,
+   built 2026-07-23, ahead of OpenStax at user request). WordPress REST API
+   (`1000wordphilosophy.com/wp-json/wp/v2`), CORS-friendly, ~229 essays,
+   fetched live at runtime (not a static manifest — the API is reliable and
+   the pool is small). Affinity-aware: filters to ethics/politics WP
+   categories when the profile favours them, unfiltered otherwise. Card body
+   is the essay's own text with the "Author / Categories / Word Count"
+   masthead stripped (its field order and word-count label vary essay to
+   essay — strip up through the word-count number, guarded by an
+   Author/Categories label). **Taxonomy map** (WP category → canonical slug),
+   in `WordPhilAdapter.CATEGORY_MAP`: Ethics / bioethics / Race / Sex & Gender
+   → `ethics`; Social & Political / Philosophy of Law → `politics`; everything
+   else → `philosophy`. CC BY-NC — satisfied by SmartTok being personal &
+   non-commercial; attribution preserved via source label + openLink.
 3. **LibreTexts** — fills gaps; licensing varies per text, check individually.
 4. **SEP** — summary sections only, link out for the rest. Reuse terms are
    not blanket CC; check first. (The unwired `adapters/philosophy.js` /
