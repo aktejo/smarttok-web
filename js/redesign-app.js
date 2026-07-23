@@ -393,6 +393,10 @@
       openBtn.rel = "noopener noreferrer";
       openBtn.setAttribute("aria-label", `Read on ${sourceName}`);
       openBtn.innerHTML = ICONS.open;
+      openBtn.addEventListener("click", () => {
+        // Reading the full article is the depth signal for the edu feed.
+        if (typeof AffinityManager !== "undefined") AffinityManager.recordOpen(content);
+      });
       rail.appendChild(openBtn);
     }
     card.appendChild(rail);
@@ -466,9 +470,42 @@
           target.classList.add("scrollable");
         }
         seenObserver.observe(cardEl);
+        dwellObserver.observe(cardEl);
       }
     });
   }
+
+  // Dwell tracking for the interest algorithm: how long each card stays
+  // ≥60% on screen. Enter stamps a start time; exit reports the duration
+  // (a fast swipe-past registers as a skip inside recordDwell).
+  const dwellStart = new Map(); // element -> timestamp
+  const dwellObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        const content = feed.items.find((i) => i.id === entry.target.dataset.id);
+        if (!content) continue;
+        if (entry.isIntersecting) {
+          if (!dwellStart.has(entry.target)) {
+            dwellStart.set(entry.target, performance.now());
+            AffinityManager.recordShown(content);
+          }
+        } else if (dwellStart.has(entry.target)) {
+          const ms = performance.now() - dwellStart.get(entry.target);
+          dwellStart.delete(entry.target);
+          AffinityManager.recordDwell(content, ms);
+        }
+      }
+    },
+    { threshold: 0.6 }
+  );
+  // Card still on screen when the page goes away = a real read; don't lose it.
+  addEventListener("pagehide", () => {
+    for (const [el, start] of dwellStart) {
+      const content = feed.items.find((i) => i.id === el.dataset.id);
+      if (content) AffinityManager.recordDwell(content, performance.now() - start);
+    }
+    dwellStart.clear();
+  });
 
   // Record a card into this visit's history once it's actually been seen.
   const seenObserver = new IntersectionObserver(
@@ -485,6 +522,8 @@
 
   feed.addEventListener("loading-start", () => {
     renderedCount = 0;
+    dwellObserver.disconnect();
+    dwellStart.clear();
     showState('<div class="rd-spinner"></div><div>Loading the good stuff…</div>');
   });
 

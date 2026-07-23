@@ -86,6 +86,10 @@ function createCardElement(content, { likesManager, onImageTap, eagerImage = fal
       openBtn.target = "_blank";
       openBtn.rel = "noopener noreferrer";
       openBtn.innerHTML = `Open original ↗`;
+      openBtn.addEventListener("click", () => {
+        // Reading the full article is the depth signal for the edu feed.
+        if (typeof AffinityManager !== "undefined") AffinityManager.recordOpen(content);
+      });
       actions.appendChild(openBtn);
     }
 

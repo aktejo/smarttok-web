@@ -46,7 +46,27 @@
       "Bash(curl -s -o /dev/null -w \"redesign.html: %{http_code}\\\\n\" \"https://smarttok-web-6.vercel.app/redesign.html\" --max-time 15)",
       "Bash(curl -s \"https://smarttok-web-6.vercel.app/css/redesign.css\" --max-time 15)",
       "Bash(curl -s \"https://smarttok-web-6.vercel.app/js/redesign-app.js\" --max-time 15)",
-      "Bash(python3 antigravity/validate_topics.py)"
+      "Bash(python3 antigravity/validate_topics.py)",
+      "Bash(git checkout *)",
+      "Bash(cat ~/Downloads/SESSION_SUMMARY.md 2>/dev/null | head -100)",
+      "Bash(curl -s --max-time 20 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=incategory%3A%22Good%20articles%22%20philosophy&gsrsort=random&gsrlimit=3&gsrnamespace=0&prop=extracts%7Cpageimages%7Cinfo%7Ccategories&exintro=1&explaintext=1&exchars=1200&inprop=url&piprop=thumbnail&pithumbsize=640&clcategories=Category%3AFeatured%20articles%7CCategory%3AGood%20articles')",
+      "Bash(curl -s --max-time 20 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=categoryinfo&titles=Category%3AFA-Class%20philosophy%20articles%7CCategory%3AGA-Class%20philosophy%20articles%7CCategory%3AGA-Class%20economics%20articles%7CCategory%3AFA-Class%20economics%20articles%7CCategory%3AGA-Class%20politics%20articles%7CCategory%3AFA-Class%20politics%20articles%7CCategory%3AGA-Class%20biology%20articles%7CCategory%3AFA-Class%20biology%20articles%7CCategory%3AGA-Class%20neuroscience%20articles%7CCategory%3AFA-Class%20neuroscience%20articles%7CCategory%3AGA-Class%20Ethics%20articles%7CCategory%3AGA-Class%20political%20science%20articles')",
+      "Bash(curl -s --max-time 20 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=categoryinfo&titles=Category%3AFA-Class%20Philosophy%20articles%7CCategory%3AGA-Class%20Philosophy%20articles%7CCategory%3AFA-Class%20Economics%20articles%7CCategory%3AGA-Class%20Economics%20articles%7CCategory%3AFA-Class%20Biology%20articles%7CCategory%3AGA-Class%20Biology%20articles%7CCategory%3AFA-Class%20ethics%20articles%7CCategory%3AGA-Class%20ethics%20articles%7CCategory%3AFA-Class%20politics%20articles%7CCategory%3AGA-Class%20politics%20articles%7CCategory%3AFA-Class%20neuroscience%20articles%7CCategory%3AGA-Class%20neuroscience%20articles')",
+      "Bash(curl -s --max-time 20 -H \"User-Agent: SmartTok/1.0 \\(personal project\\)\" 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=categoryinfo&titles=Category%3AFA-Class%20Philosophy%20articles%7CCategory%3AGA-Class%20Philosophy%20articles%7CCategory%3AFA-Class%20Economics%20articles%7CCategory%3AGA-Class%20Economics%20articles%7CCategory%3AFA-Class%20Biology%20articles%7CCategory%3AGA-Class%20Biology%20articles%7CCategory%3AFA-Class%20ethics%20articles%7CCategory%3AGA-Class%20ethics%20articles%7CCategory%3AFA-Class%20politics%20articles%7CCategory%3AGA-Class%20politics%20articles%7CCategory%3AFA-Class%20neuroscience%20articles%7CCategory%3AGA-Class%20neuroscience%20articles' -o /tmp/catinfo.json -w \"HTTP %{http_code}\\\\n\")",
+      "Read(//tmp/**)",
+      "Bash(curl -s --max-time 20 -H \"User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)\" 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=categoryinfo&titles=Category%3AFA-Class%20Philosophy%20articles%7CCategory%3AGA-Class%20Philosophy%20articles%7CCategory%3AFA-Class%20Economics%20articles%7CCategory%3AGA-Class%20Economics%20articles%7CCategory%3AFA-Class%20Biology%20articles%7CCategory%3AGA-Class%20Biology%20articles%7CCategory%3AFA-Class%20ethics%20articles%7CCategory%3AGA-Class%20ethics%20articles%7CCategory%3AFA-Class%20politics%20articles%7CCategory%3AGA-Class%20politics%20articles%7CCategory%3AFA-Class%20neuroscience%20articles%7CCategory%3AGA-Class%20neuroscience%20articles')",
+      "Bash(curl -s --max-time 20 -H \"User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)\" 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&list=categorymembers&cmtitle=Category%3AGA-Class%20Economics%20articles&cmlimit=10&cmtype=page')",
+      "Bash(curl -s --max-time 20 -H \"User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)\" 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&list=search&srsearch=morelike%3AJohn%20Rawls&srlimit=10&srnamespace=0&srprop=')",
+      "Bash(curl -s --max-time 20 -H \"User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)\" 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&titles=John%20Rawls%7CBengal%20famine%20of%201943%7CMarc%20Bloch&prop=extracts%7Cpageimages%7Cinfo&exintro=1&explaintext=1&exchars=800&exlimit=20&inprop=url&piprop=thumbnail&pithumbsize=640&redirects=1')",
+      "Bash(curl -s -o /dev/null -w \"proxy arxiv: %{http_code} %{time_total}s\\\\n\" \"http://localhost:3001/api/proxy?url=$\\(python3 -c \"import urllib.parse;print\\(urllib.parse.quote\\('https://export.arxiv.org/api/query?search_query=cat:cs.AI&start=0&max_results=1',safe=''\\)\\)\"\\)\" --max-time 30)",
+      "Bash(curl -s -o /dev/null -w \"arxiv direct: %{http_code} %{time_total}s\\\\n\" \"https://export.arxiv.org/api/query?search_query=cat:cs.AI&start=0&max_results=1\" --max-time 25)",
+      "Bash(curl -s -o /dev/null -w \"poetry direct: %{http_code} %{time_total}s\\\\n\" \"https://poetrydb.org/random/1\" --max-time 25)",
+      "Bash(git reset *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git tag *)",
+      "Bash(git show *)",
+      "Bash(git merge --no-ff edu-depth-feed -m ' *)",
+      "Bash(git commit *)"
     ]
   }
 }
