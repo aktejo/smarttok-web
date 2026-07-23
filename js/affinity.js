@@ -373,6 +373,14 @@ const AffinityManager = {
       .map((t) => [t, Math.round(a[t] * 100) / 100]);
   },
 
+  /** Full learned vector as [{tag, weight}], strongest first — for the UI. */
+  learnedTopics() {
+    const a = this._load().affinity;
+    return Object.keys(a)
+      .map((t) => ({ tag: t, weight: a[t] }))
+      .sort((x, y) => y.weight - x.weight);
+  },
+
   reset() {
     this._profile = null;
     try {

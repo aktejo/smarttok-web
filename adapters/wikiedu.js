@@ -50,6 +50,7 @@ const WikiEduAdapter = {
 
   _poolPromise: null,
   _served: new Set(), // titles handed out this session — cheap pre-dedup
+  _factCache: {}, // content.id -> surprising fact string | null (per session)
 
   async fetchNext(count = 3) {
     try {
@@ -154,6 +155,95 @@ const WikiEduAdapter = {
     });
     const data = await this._get(params);
     return (data.query?.search || []).map((r) => r.title);
+  },
+
+  // ---------- Surprising fact ----------
+
+  /**
+   * A "did you know"-style fact for a Deep Dive card: a standalone sentence
+   * from deeper in the article (beyond the lead already shown on the card),
+   * picked by a surprise heuristic. Lazy + cached per card; resolves null when
+   * nothing good turns up (the UI then shows no box). Fully client-side, no LLM.
+   */
+  async surprisingFact(content) {
+    if (content.id in this._factCache) return this._factCache[content.id];
+    const pageid = String(content.id).replace(/^wikiedu-/, "");
+    let fact = null;
+    try {
+      // NB: exchars/exsentences make TextExtracts return the LEAD section
+      // only — to get body text (where the surprising facts are) we must
+      // fetch the full plaintext extract. Lazy + cached per card, so the
+      // larger payload is paid once, only for cards actually viewed.
+      const params = new URLSearchParams({
+        action: "query",
+        format: "json",
+        origin: "*",
+        pageids: pageid,
+        prop: "extracts",
+        explaintext: "1",
+      });
+      const data = await this._get(params);
+      const full = (data.query?.pages?.[pageid]?.extract || "")
+        .replace(/\[\d+\]/g, "")
+        // plaintext extracts keep "== Heading ==" markers — turn them into
+        // sentence breaks so a heading can't fuse onto the next sentence.
+        .replace(/[ \t]*={2,}[^=\n]+={2,}[ \t]*/g, ". ");
+      fact = this._pickSurprisingFact(full, content.body || "");
+    } catch (_) {}
+    this._factCache[content.id] = fact;
+    return fact;
+  },
+
+  _splitSentences(text) {
+    return (text.match(/[^.!?]+[.!?]+(?=\s|$)/g) || []).map((s) => s.trim());
+  },
+
+  /**
+   * Score sentences from beyond the lead and return the most "surprising" one.
+   * Rewards surprise markers, etymology, and concrete numbers; rejects
+   * pronoun-led (context-dependent) and clause-dense sentences; requires a
+   * genuine signal to fire at all (else null).
+   */
+  _pickSurprisingFact(fullText, intro) {
+    if (!fullText) return null;
+    // Start after the lead (already shown on the card) when we can locate it,
+    // and only scan the early body — that's where the best facts sit and it
+    // bounds the work on very long articles.
+    let body = fullText;
+    const tail = intro.replace(/\s+/g, " ").trim().slice(-40);
+    const at = tail ? fullText.indexOf(tail) : -1;
+    if (at > -1) body = fullText.slice(at + tail.length);
+    body = body.slice(0, 9000);
+
+    const introSet = new Set(this._splitSentences(intro));
+    const MARKERS = /\b(surprising|surprisingly|unexpected|unexpectedly|despite|contrary|actually|in fact|remarkably|notably|ironically|paradox|unusual|rare|rarely|unlike|only|first|largest|smallest|longest|oldest|fastest|deadliest|record|originally|myth|nickname|coined)\b/i;
+    const ETYM = /\b(named after|named for|derived from|comes from|the name|the word|literally means|means)\b/i;
+    const UNITS = /\b(percent|million|billion|thousand|times|years?|centuries|decades|km|kg|metres|meters|degrees)\b/i;
+    // Biographical CV / chronology sentences — dry trivia, not "surprising
+    // facts", and common on the person-articles the broad pool includes.
+    const BIO_SKIP = /\b(received|graduated|elected|re-elected|appointed|was born|born in|married|divorced|retired|enrolled|attended|succeeded|promoted to)\b/i;
+
+    let best = null;
+    let bestScore = 2; // a bare number (score 2) isn't enough — need to beat this
+    for (const s of this._splitSentences(body)) {
+      if (s.length < 60 || s.length > 240) continue;
+      if (introSet.has(s)) continue;
+      if (/^[a-z]/.test(s)) continue; // fragment from a mid-word split
+      if (/\s[A-Z]\.$/.test(s)) continue; // truncated on an initial ("… by G.")
+      if (/^(he|she|it|they|these|those|this|his|her|their|its|there)\b/i.test(s)) continue;
+      if (BIO_SKIP.test(s)) continue;
+      if ((s.match(/[,;(]/g) || []).length > 5) continue;
+      let score = 0;
+      if (MARKERS.test(s)) score += 3;
+      if (ETYM.test(s)) score += 3;
+      if (/\d/.test(s)) score += 2;
+      if (UNITS.test(s)) score += 1;
+      if (score > bestScore) {
+        bestScore = score;
+        best = s;
+      }
+    }
+    return best;
   },
 
   // ---------- Content fetch ----------

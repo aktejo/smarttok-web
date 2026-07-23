@@ -158,6 +158,32 @@
     textEl.className = "rd-text";
     textEl.textContent = text;
     inner.appendChild(textEl);
+
+    // "Did you know?" box for Deep Dives — appended only once a fact resolves,
+    // so there's no empty-box flash when there isn't one.
+    if (
+      content.sourceKey === "wikiedu" &&
+      !content.tags?.includes("error") &&
+      typeof WikiEduAdapter !== "undefined"
+    ) {
+      WikiEduAdapter.surprisingFact(content)
+        .then((f) => {
+          if (!f) return;
+          const fact = document.createElement("div");
+          fact.className = "rd-fact";
+          const lbl = document.createElement("span");
+          lbl.className = "rd-fact-label";
+          lbl.textContent = "Did you know?";
+          const txt = document.createElement("span");
+          txt.className = "rd-fact-text";
+          txt.textContent = f;
+          fact.appendChild(lbl);
+          fact.appendChild(txt);
+          inner.appendChild(fact);
+        })
+        .catch(() => {});
+    }
+
     card.appendChild(body);
 
     // ---- Image-card gestures ----
@@ -715,10 +741,8 @@
     }
   }
 
-  // ---------- Sources (enabled/available sections + frequency concept) ----------
-  const FREQ_KEY_PREFIX = "smarttok.rd.freq.";
-
-  function _sourceRow(adapter, { withFreq }) {
+  // ---------- Sources (enabled/available sections + learned preferences) ----------
+  function _sourceRow(adapter) {
     const isOn = settings.isEnabled(adapter.sourceKey);
     const onlyOne = settings.getEnabledKeys().length === 1 && isOn;
 
@@ -728,26 +752,6 @@
 
     const controls = document.createElement("span");
     controls.className = "rd-source-controls";
-
-    if (withFreq) {
-      const wrap = document.createElement("span");
-      wrap.className = "rd-freq-wrap";
-      const select = document.createElement("select");
-      select.className = "rd-freq";
-      select.setAttribute("aria-label", `${adapter.displayName} frequency`);
-      for (const opt of ["Frequently", "Daily", "Weekly"]) {
-        const o = document.createElement("option");
-        o.value = opt;
-        o.textContent = opt;
-        select.appendChild(o);
-      }
-      select.value = localStorage.getItem(FREQ_KEY_PREFIX + adapter.sourceKey) || "Frequently";
-      select.addEventListener("change", () => {
-        localStorage.setItem(FREQ_KEY_PREFIX + adapter.sourceKey, select.value);
-      });
-      wrap.appendChild(select);
-      controls.appendChild(wrap);
-    }
 
     const sw = document.createElement("button");
     sw.className = "rd-switch" + (isOn ? " on" : "");
@@ -762,6 +766,60 @@
     return row;
   }
 
+  // "What the feed has learned": the open-tag affinity vector, rendered as
+  // weighted bars. The vector is shared across sources (one taxonomy), so it's
+  // shown for the feed as a whole rather than per source.
+  function _renderPreferences() {
+    const wrap = document.createElement("div");
+    wrap.className = "rd-prefs";
+
+    const label = document.createElement("div");
+    label.className = "rd-section-label";
+    label.textContent = "What the feed has learned";
+    wrap.appendChild(label);
+
+    const topics = AffinityManager.learnedTopics();
+    const liked = topics.filter((t) => t.weight > 0.05).slice(0, 15);
+    const avoided = topics.filter((t) => t.weight < -0.05).slice(-6).reverse();
+
+    if (liked.length === 0 && avoided.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "rd-hint";
+      empty.textContent =
+        "Nothing yet — read, save, and open a few cards and the topics you gravitate toward will show up here.";
+      wrap.appendChild(empty);
+      return wrap;
+    }
+
+    const maxAbs = Math.max(1, ...topics.map((t) => Math.abs(t.weight)));
+    const makeRow = (t) => {
+      const row = document.createElement("div");
+      row.className = "rd-pref-row" + (t.weight < 0 ? " neg" : "");
+      const name = document.createElement("span");
+      name.className = "rd-pref-name";
+      name.textContent = t.tag;
+      const bar = document.createElement("span");
+      bar.className = "rd-pref-bar";
+      const fill = document.createElement("span");
+      fill.className = "rd-pref-fill";
+      fill.style.width = `${Math.round((Math.abs(t.weight) / maxAbs) * 100)}%`;
+      bar.appendChild(fill);
+      row.appendChild(name);
+      row.appendChild(bar);
+      return row;
+    };
+
+    for (const t of liked) wrap.appendChild(makeRow(t));
+    if (avoided.length > 0) {
+      const sub = document.createElement("div");
+      sub.className = "rd-pref-sub";
+      sub.textContent = "Tends to skip";
+      wrap.appendChild(sub);
+      for (const t of avoided) wrap.appendChild(makeRow(t));
+    }
+    return wrap;
+  }
+
   function renderSources() {
     const list = document.getElementById("rd-sources-list");
     list.innerHTML = "";
@@ -774,7 +832,7 @@
       label.className = "rd-section-label";
       label.textContent = "Enabled Sources";
       list.appendChild(label);
-      for (const adapter of enabled) list.appendChild(_sourceRow(adapter, { withFreq: true }));
+      for (const adapter of enabled) list.appendChild(_sourceRow(adapter));
     }
 
     if (available.length > 0) {
@@ -782,8 +840,10 @@
       label.className = "rd-section-label";
       label.textContent = "Available Sources";
       list.appendChild(label);
-      for (const adapter of available) list.appendChild(_sourceRow(adapter, { withFreq: false }));
+      for (const adapter of available) list.appendChild(_sourceRow(adapter));
     }
+
+    list.appendChild(_renderPreferences());
   }
 
   const tabs = document.querySelectorAll(".rd-nav button");

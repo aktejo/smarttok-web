@@ -111,6 +111,31 @@ concept articles, filter person/event pages) is a separate follow-up; the
 open-tag model plus max-pooling/decay/pruning keep the resulting noise
 self-limiting in the meantime.
 
+## Feed UI additions (2026-07-23)
+
+Three changes to the redesign UI + card renderers:
+
+- **Removed the frequency dropdown** from the redesign Sources page — it was a
+  concept mock never wired to the mixer. How often a source appears is meant to
+  be algorithmic; the dropdown implied manual control that didn't exist.
+- **Preferences viewer** on the redesign Sources page ("What the feed has
+  learned"): renders the open-tag affinity vector as weighted bars —
+  `AffinityManager.learnedTopics()`, split into liked topics and a "Tends to
+  skip" (negative-weight) section. Shown feed-wide, not per source, because the
+  taxonomy is one shared vocabulary. Cold-start empty state included.
+- **"Did you know?" fact box** on Deep Dive (wikiedu) cards, both UIs
+  (`.card-fact` / `.rd-fact`). `WikiEduAdapter.surprisingFact(content)` lazily
+  fetches the full article plaintext (NB: `exchars`/`exsentences` return the
+  lead only — must fetch full), strips `== headings ==`, and picks the most
+  "surprising" early-body sentence by heuristic: rewards surprise markers /
+  etymology / numbers; rejects intro dupes, pronoun-led and fragment sentences
+  (lowercase-start, initial-truncated), clause-dense sentences, and
+  biographical CV lines (received/graduated/elected/…). Cached per card;
+  resolves null (no box) when nothing clears the bar. No LLM. Concept articles
+  give excellent facts (Cerebellum, Photosynthesis, Black hole); person-article
+  facts are weaker — another symptom of the broad pool, self-limited by the
+  CV filter.
+
 ## Phase 2 — more sources (only after Phase 1 ranking feels good)
 
 Adapter per source behind the same contract, then per-source quotas so the

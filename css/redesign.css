@@ -641,7 +641,7 @@ html, body {
   border: 1px solid var(--rd-hairline);
 }
 
-/* ---------- Sources: badges, controls, frequency ---------- */
+/* ---------- Sources: badges, controls ---------- */
 .rd-source-badge {
   width: 28px;
   height: 28px;
@@ -653,31 +653,69 @@ html, body {
   font-size: 0.85rem;
 }
 .rd-source-controls { display: flex; align-items: center; gap: 12px; }
-.rd-freq-wrap { position: relative; }
-.rd-freq {
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  border: none;
-  color: var(--rd-muted);
-  font-family: var(--rd-ui);
-  font-size: 0.78rem;
-  padding-right: 14px;
-  cursor: pointer;
-  outline: none;
-  text-align: right;
+
+/* ---------- Sources: learned-preferences panel ---------- */
+.rd-prefs { margin-top: 26px; }
+.rd-pref-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
 }
-.rd-freq-wrap::after {
-  content: "⌄";
-  position: absolute;
-  right: 0;
-  top: 45%;
-  transform: translateY(-50%);
-  color: var(--rd-muted);
-  font-size: 0.7rem;
-  pointer-events: none;
+.rd-pref-name {
+  font-size: 0.9rem;
+  color: var(--rd-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
 }
-.rd-freq option { background: var(--rd-surface); color: var(--rd-text); }
+.rd-pref-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--rd-chip);
+  overflow: hidden;
+}
+.rd-pref-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--rd-accent);
+}
+.rd-pref-row.neg .rd-pref-name { color: var(--rd-muted); }
+.rd-pref-row.neg .rd-pref-fill { background: #7a4b4b; }
+.rd-pref-sub {
+  margin: 16px 0 4px;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rd-muted);
+}
+
+/* ---------- Deep Dive "Did you know?" fact box ---------- */
+.rd-fact {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--rd-chip);
+  border: 1px solid var(--rd-hairline);
+  border-left: 3px solid var(--rd-accent);
+}
+.rd-fact-label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rd-accent);
+  margin-bottom: 6px;
+}
+.rd-fact-text {
+  font-family: var(--rd-serif);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--rd-text);
+}
 
 .rd-search-box {
   width: 100%;

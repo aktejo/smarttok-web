@@ -57,6 +57,29 @@ function createCardElement(content, { likesManager, onImageTap, eagerImage = fal
   text.className = "card-text";
   text.innerHTML = renderMarkdownBody(content.body);
   body.appendChild(text);
+
+  // "Did you know?" box for Deep Dives (wikiedu) — lazily fetched, appended
+  // only when a surprising fact is found so there's no empty-box flash.
+  if (
+    content.sourceKey === "wikiedu" &&
+    !content.tags?.includes("error") &&
+    typeof WikiEduAdapter !== "undefined"
+  ) {
+    WikiEduAdapter.surprisingFact(content)
+      .then((f) => {
+        if (!f) return;
+        const fact = document.createElement("div");
+        fact.className = "card-fact";
+        fact.innerHTML = `<span class="card-fact-label">Did you know?</span>`;
+        const txt = document.createElement("span");
+        txt.className = "card-fact-text";
+        txt.textContent = f;
+        fact.appendChild(txt);
+        body.appendChild(fact);
+      })
+      .catch(() => {});
+  }
+
   card.appendChild(body);
 
   // Action row — skip for error cards (nothing to like/open).

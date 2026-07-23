@@ -207,6 +207,29 @@ main {
 
 .card.is-error .card-text { color: var(--error); font-style: italic; }
 
+/* Deep Dive "Did you know?" fact box */
+.card-fact {
+  margin-top: var(--space-2);
+  padding: 0.85rem 1rem;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+}
+.card-fact-label {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
+.card-fact-text {
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
 .card-actions {
   display: flex;
   align-items: center;
