@@ -8,12 +8,12 @@
  * "Open original" link to the full essay.
  *
  * Content comes from the site's WordPress REST API, which is CORS-friendly
- * (origin-reflected) — no proxy needed. Fetching is affinity-aware: when the
- * user's profile favours ethics or politics, the query is filtered to those
- * WordPress categories; otherwise it pulls unfiltered (the anthology is
- * philosophy top-to-bottom). Each essay is tagged with canonical
- * AffinityManager slugs via CATEGORY_MAP, so it feeds the same interest
- * vector as the Deep Dives (wikiedu) source.
+ * (origin-reflected) — no proxy needed. Taxonomy is open and fine-grained
+ * (see AffinityManager): each essay is tagged with its OWN WordPress category
+ * names (Ethics, Metaphysics, Philosophy of Religion, …), normalized through
+ * cleanTopics — no hand-written mapping table. Fetching is affinity-aware:
+ * chooseBucket leans toward whichever WordPress categories your engaged topics
+ * favour, and the query is filtered to that category.
  */
 const WordPhilAdapter = {
   sourceKey: "wordphil",
@@ -21,42 +21,34 @@ const WordPhilAdapter = {
   icon: "💭",
 
   API: "https://1000wordphilosophy.com/wp-json/wp/v2",
+  CATS_STORAGE_KEY: "smarttok.wordphil.cats",
+  CATS_TTL_MS: 7 * 24 * 60 * 60 * 1000,
   REQUEST_TIMEOUT_MS: 10000,
+  MIN_BUCKET_COUNT: 3, // ignore near-empty categories as fetch buckets
 
-  // WordPress category ID -> canonical slug. Everything not listed defaults to
-  // "philosophy": the anthology is entirely philosophy, and only ethics /
-  // politics get their own affinity bucket in our taxonomy. (IDs verified
-  // 2026-07 against wp/v2/categories.)
-  CATEGORY_MAP: {
-    8289: "ethics", // Ethics
-    766334143: "ethics", // bioethics
-    11798: "ethics", // Race
-    146694: "ethics", // Sex & Gender
-    2118287: "politics", // Social & Political
-    524128: "politics", // Philosophy of Law
-  },
-
-  // Canonical slug -> WordPress category IDs to filter on when affinity favours
-  // it. Slugs with no 1000WP content (economics/biology/neuroscience) and the
-  // catch-all "philosophy" fall through to an unfiltered pull.
-  SLUG_FILTERS: {
-    ethics: [8289, 766334143, 11798, 146694],
-    politics: [2118287, 524128],
-  },
-
+  _cats: null, // { id: {name, count} }
+  _catsPromise: null,
   _totals: { all: 229 }, // X-WP-Total per filter key, self-correcting from headers
   _served: new Set(),
 
   async fetchNext(count = 3) {
     try {
-      const slug = AffinityManager.pickCategory();
-      const cats = this.SLUG_FILTERS[slug] || null;
-      const key = cats ? cats.join(",") : "all";
-      const posts = await this._fetchPage(key, cats, count);
+      const cats = await this._ensureCategories();
+      const bucketKeys = Object.keys(cats)
+        .filter(
+          (id) =>
+            cats[id].count >= this.MIN_BUCKET_COUNT &&
+            cats[id].name.toLowerCase() !== "uncategorized"
+        )
+        .map((id) => `wordphil:${id}`);
+
+      const chosen = AffinityManager.chooseBucket(bucketKeys);
+      const catId = chosen ? chosen.slice("wordphil:".length) : null;
+      const posts = await this._fetchPage(catId, count);
 
       const items = [];
       for (const p of posts) {
-        const content = this._toContent(p);
+        const content = this._toContent(p, cats);
         if (content && !this._served.has(content.id)) {
           this._served.add(content.id);
           items.push(content);
@@ -71,8 +63,9 @@ const WordPhilAdapter = {
     }
   },
 
-  /** One page of posts at a random offset within the (filtered) pool. */
-  async _fetchPage(key, cats, count) {
+  /** One page of posts at a random offset within the (optionally filtered) pool. */
+  async _fetchPage(catId, count) {
+    const key = catId || "all";
     const total = this._totals[key] || 50;
     const offset = Math.floor(Math.random() * Math.max(1, total - count));
     const params = new URLSearchParams({
@@ -80,7 +73,7 @@ const WordPhilAdapter = {
       offset: String(offset),
       _fields: "id,link,title,content,categories,jetpack_featured_media_url",
     });
-    if (cats) params.set("categories", cats.join(","));
+    if (catId) params.set("categories", catId);
 
     const { data, total: fetchedTotal } = await this._get(`/posts?${params}`);
     if (fetchedTotal !== null) this._totals[key] = fetchedTotal;
@@ -94,14 +87,21 @@ const WordPhilAdapter = {
     return data || [];
   },
 
-  _toContent(p) {
+  _toContent(p, cats) {
     const body = this._extractBody(p.content?.rendered || "");
     if (body.length < 160) return null; // too thin to be a worthwhile card
 
-    const cats = [
-      ...new Set((p.categories || []).map((id) => this.CATEGORY_MAP[id] || "philosophy")),
-    ];
-    const categories = cats.length > 0 ? cats : ["philosophy"];
+    const rawNames = (p.categories || [])
+      .map((id) => cats[id]?.name)
+      .filter(Boolean);
+    let topics = AffinityManager.cleanTopics(rawNames);
+    if (topics.length === 0) topics = ["philosophy"]; // coarse fallback
+
+    // Link every category this essay belongs to back to its topics, so
+    // chooseBucket learns which categories tend to yield content you like.
+    for (const id of p.categories || []) {
+      if (cats[id]) AffinityManager.linkBucket(`wordphil:${id}`, topics);
+    }
 
     return makeContent({
       id: `wordphil-${p.id}`,
@@ -113,9 +113,50 @@ const WordPhilAdapter = {
         ? { url: p.jetpack_featured_media_url, alt: "" }
         : null,
       attribution: "1000-Word Philosophy",
-      tags: categories,
-      categories,
+      tags: [],
+      topics,
     });
+  },
+
+  /** Category id -> {name, count}, fetched once and cached 7 days. */
+  async _ensureCategories() {
+    if (this._cats) return this._cats;
+    try {
+      const raw = localStorage.getItem(this.CATS_STORAGE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (cached.builtAt && Date.now() - cached.builtAt < this.CATS_TTL_MS) {
+          this._cats = cached.cats;
+          return this._cats;
+        }
+      }
+    } catch (_) {}
+
+    if (!this._catsPromise) {
+      this._catsPromise = this._fetchCategories().finally(() => {
+        this._catsPromise = null;
+      });
+    }
+    return this._catsPromise;
+  },
+
+  async _fetchCategories() {
+    const { data } = await this._get(
+      "/categories?per_page=100&_fields=id,name,count"
+    );
+    const cats = {};
+    for (const c of data || []) {
+      cats[c.id] = { name: this._decode(c.name || ""), count: c.count || 0 };
+    }
+    if (Object.keys(cats).length === 0) throw new Error("no wordphil categories");
+    this._cats = cats;
+    try {
+      localStorage.setItem(
+        this.CATS_STORAGE_KEY,
+        JSON.stringify({ builtAt: Date.now(), cats })
+      );
+    } catch (_) {}
+    return cats;
   },
 
   /**

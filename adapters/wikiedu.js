@@ -12,10 +12,13 @@
  * 7 days, so steady-state cost is one batched extract query per fetch.
  *
  * Ranking per fetch (via AffinityManager):
- *   - candidate titles picked per-slot from affinity-weighted categories
+ *   - candidate titles gathered from bucket-biased pool picks (chooseBucket
+ *     leans toward WikiProject buckets whose articles you engage with)
  *   - plus "morelike:" neighbors of recently-engaged articles intersected
  *     with the pool (graph proximity, replaces the deprecated page/related)
- *   - scored: affinity + tier bonus (FA > GA) + proximity bonus − novelty
+ *   - each candidate's extract query returns the article's OWN categories,
+ *     which become its fine-grained topics; items are then scored on those
+ *     topics (affinity + tier bonus (FA > GA) + proximity bonus − novelty)
  *   - ~18% of slots are random (exploration floor)
  *
  * All Wikipedia APIs here support CORS via origin=* — no proxy needed.
@@ -52,16 +55,25 @@ const WikiEduAdapter = {
     try {
       const pool = await this._ensurePool();
       const candidates = await this._gatherCandidates(pool, count);
-      if (candidates.length === 0) {
+      if (candidates.size === 0) {
         return [makeErrorContent(this.sourceKey, this.displayName, null)];
       }
-      const chosen = AffinityManager.rank(candidates, count);
-      const items = await this._fetchExtracts(chosen);
+      // Fetch extracts + real categories for the whole candidate set, then
+      // rank on the fine-grained topics (which only exist post-fetch).
+      const items = await this._fetchExtracts(candidates);
       if (items.length === 0) {
         return [makeErrorContent(this.sourceKey, this.displayName, null)];
       }
-      for (const item of items) this._served.add(item.title);
-      return items;
+      const scored = items.map((it) => ({
+        item: it,
+        score: AffinityManager.score(it.topics, it._bonus || 0),
+      }));
+      const chosen = AffinityManager.rank(scored, count);
+      for (const it of chosen) {
+        this._served.add(it.title);
+        delete it._bonus;
+      }
+      return chosen;
     } catch (_) {
       return [makeErrorContent(this.sourceKey, this.displayName, null)];
     }
@@ -70,22 +82,25 @@ const WikiEduAdapter = {
   // ---------- Candidate selection ----------
 
   /**
-   * Build a scored candidate list ~3x the requested count: affinity-weighted
-   * random picks from the pool, plus morelike proximity hits when the user
-   * has recent engagement to seed from.
+   * Gather ~3x the requested count of candidate titles: bucket-biased random
+   * picks from the quality pool (chooseBucket leans toward WikiProject buckets
+   * whose articles you've engaged with), plus morelike proximity hits when the
+   * user has recent engagement to seed from. Returns a Map title -> {slug,
+   * tier, bonus}. Fine-grained topics and final scoring happen after the
+   * extract fetch — pre-fetch we only know the pool bucket, not the article's
+   * real categories.
    */
   async _gatherCandidates(pool, count) {
-    const byTitle = new Map(); // title -> {item:{title, cat, tier}, score}
+    const byTitle = new Map();
+    const bucketKeys = Object.keys(this.CATEGORY_SOURCES).map((s) => `wikiedu:${s}`);
 
-    const addCandidate = (title, cat, tier, bonus) => {
+    const add = (title, slug, tier, bonus) => {
       if (this._served.has(title) || byTitle.has(title)) return;
-      const score = AffinityManager.score([cat], (this.TIER_BONUS[tier] || 0) + bonus);
-      byTitle.set(title, { item: { title, cat, tier }, score });
+      byTitle.set(title, { slug, tier, bonus });
     };
 
     // Graph proximity: morelike neighbors of one recently-engaged article,
-    // kept only if they're in the quality pool. Best-effort — a failed or
-    // empty proximity query just means no proximity candidates this round.
+    // kept only if they're in the quality pool. Best-effort.
     const engaged = AffinityManager.recentEngagedTitles();
     if (engaged.length > 0) {
       const seed = engaged[Math.floor(Math.random() * engaged.length)];
@@ -93,33 +108,35 @@ const WikiEduAdapter = {
         const neighbors = await this._moreLike(seed);
         for (const title of neighbors) {
           const home = this._findInPool(pool, title);
-          if (home) addCandidate(title, home.cat, home.tier, this.PROXIMITY_BONUS);
+          if (home) add(title, home.slug, home.tier, this.PROXIMITY_BONUS);
         }
       } catch (_) {}
     }
 
-    // Affinity-weighted picks fill the rest.
-    const want = count * this.CANDIDATES_PER_SLOT;
+    // Bucket-biased picks fill the rest (capped at the 20-title extract limit).
+    const want = Math.min(20, count * this.CANDIDATES_PER_SLOT);
     let guard = want * 6;
     while (byTitle.size < want && guard-- > 0) {
-      const cat = AffinityManager.pickCategory();
-      const tiers = pool[cat];
+      const bucketKey = AffinityManager.chooseBucket(bucketKeys);
+      if (!bucketKey) break;
+      const slug = bucketKey.slice("wikiedu:".length);
+      const tiers = pool[slug];
       if (!tiers) continue;
       // FA lists are tiny; give them a 1-in-4 draw so they surface without
       // drowning out the much larger GA pools.
       const tier = Math.random() < 0.25 && tiers.FA.length > 0 ? "FA" : "GA";
       const list = tiers[tier].length > 0 ? tiers[tier] : tiers.GA;
       if (list.length === 0) continue;
-      addCandidate(list[Math.floor(Math.random() * list.length)], cat, tier, 0);
+      add(list[Math.floor(Math.random() * list.length)], slug, tier, 0);
     }
 
-    return [...byTitle.values()];
+    return byTitle;
   },
 
   _findInPool(pool, title) {
-    for (const [cat, tiers] of Object.entries(pool)) {
-      if (tiers.FA.includes(title)) return { cat, tier: "FA" };
-      if (tiers.GA.includes(title)) return { cat, tier: "GA" };
+    for (const [slug, tiers] of Object.entries(pool)) {
+      if (tiers.FA.includes(title)) return { slug, tier: "FA" };
+      if (tiers.GA.includes(title)) return { slug, tier: "GA" };
     }
     return null;
   },
@@ -141,16 +158,22 @@ const WikiEduAdapter = {
 
   // ---------- Content fetch ----------
 
-  /** One batched query for extracts + thumbnails + canonical URLs. */
-  async _fetchExtracts(chosen) {
-    const byTitle = new Map(chosen.map((c) => [c.title, c]));
+  /**
+   * One batched query for extracts + thumbnails + canonical URLs + the
+   * articles' own (non-hidden) categories. Those categories become the item's
+   * fine-grained topics via cleanTopics; `clshow=!hidden` drops most Wikipedia
+   * maintenance junk for free. Each item also links its topics back to its
+   * pool bucket so chooseBucket learns what that bucket tends to yield.
+   */
+  async _fetchExtracts(candidates) {
+    const titles = [...candidates.keys()];
     const params = new URLSearchParams({
       action: "query",
       format: "json",
       origin: "*",
-      titles: chosen.map((c) => c.title).join("|"),
+      titles: titles.join("|"),
       redirects: "1",
-      prop: "extracts|pageimages|info",
+      prop: "extracts|pageimages|info|categories",
       exintro: "1",
       explaintext: "1",
       exchars: "1200",
@@ -158,6 +181,8 @@ const WikiEduAdapter = {
       inprop: "url",
       piprop: "thumbnail",
       pithumbsize: "640",
+      cllimit: "500",
+      clshow: "!hidden",
     });
     const data = await this._get(params);
 
@@ -172,24 +197,32 @@ const WikiEduAdapter = {
       if (page.missing !== undefined) continue;
       const extract = (page.extract || "").replace(/\[\d+\]/g, "").trim();
       if (extract.length < 200) continue; // stubs/disambiguation aren't worth a card
+
       const meta =
-        byTitle.get(page.title) || byTitle.get(redirected.get(page.title)) || {};
-      items.push(
-        makeContent({
-          id: `wikiedu-${page.pageid}`,
-          sourceKey: this.sourceKey,
-          title: page.title,
-          body: extract,
-          openLink: page.fullurl || null,
-          media: page.thumbnail
-            ? { url: page.thumbnail.source, alt: page.title }
-            : null,
-          attribution: "Wikipedia",
-          tags: meta.cat ? [meta.cat, meta.tier] : [],
-          timestamp: page.touched || null,
-          categories: meta.cat ? [meta.cat] : [],
-        })
+        candidates.get(page.title) || candidates.get(redirected.get(page.title)) || {};
+      const rawCats = (page.categories || []).map((c) =>
+        c.title.replace(/^Category:/, "")
       );
+      let topics = AffinityManager.cleanTopics(rawCats);
+      if (topics.length === 0 && meta.slug) topics = [meta.slug]; // coarse fallback
+      if (meta.slug) AffinityManager.linkBucket(`wikiedu:${meta.slug}`, topics);
+
+      const item = makeContent({
+        id: `wikiedu-${page.pageid}`,
+        sourceKey: this.sourceKey,
+        title: page.title,
+        body: extract,
+        openLink: page.fullurl || null,
+        media: page.thumbnail
+          ? { url: page.thumbnail.source, alt: page.title }
+          : null,
+        attribution: "Wikipedia",
+        tags: [],
+        timestamp: page.touched || null,
+        topics,
+      });
+      item._bonus = (this.TIER_BONUS[meta.tier] || 0) + (meta.bonus || 0);
+      items.push(item);
     }
     return items;
   },

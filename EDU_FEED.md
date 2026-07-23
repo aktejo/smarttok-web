@@ -27,16 +27,20 @@ undergraduate survey course, not Reddit TIL.
 | Old philosophy/economics adapters | Superseded and unwired (files kept for Phase 2 reference) |
 | Target pages | Both index.html and redesign.html (+ verify.html) |
 
+> **Taxonomy note:** Phase 1 originally used a fixed six-category vector.
+> That was replaced by **open fine-grained tags** — see
+> "Taxonomy v2" below, which supersedes the six-slug description here.
+
 ## Phase 1 implementation (this branch)
 
 - **`js/affinity.js` — AffinityManager**: localStorage profile
-  (`smarttok.affinity`) holding a category affinity vector over the six
-  canonical slugs, a recent-shown window (novelty penalty), and
-  recently-engaged titles (proximity seeds). Signal weights: save +4,
-  open +3 (the depth signal — replaces the brief's sequence-completion),
-  long dwell +1.5, short dwell +0.5, sub-1.2s skip −0.75. All weights decay
-  1% per signal so old interests fade. `rank()` reserves ~18% of slots for
-  random picks.
+  (`smarttok.affinity`) holding an affinity vector, a recent-shown window
+  (novelty penalty), and recently-engaged titles (proximity seeds). Signal
+  weights: save +4, open +3 (the depth signal — replaces the brief's
+  sequence-completion), long dwell +1.5, short dwell +0.5, sub-1.2s skip
+  −0.75. All weights decay 1% per signal so old interests fade. `rank()`
+  reserves ~18% of slots for random picks. (Vector is now keyed by open
+  fine-grained tags, not six slugs — see Taxonomy v2.)
 - **`adapters/wikiedu.js` — "Deep Dives"**: pool comes from WikiProject
   assessment categories (e.g. `Category:GA-Class Philosophy articles`,
   12 categories, ~2,200 articles) — precise topical + quality tagging, unlike
@@ -47,9 +51,9 @@ undergraduate survey course, not Reddit TIL.
   `page/related` endpoint is deprecated). Scoring: affinity + tier bonus
   (FA 1.5 / GA 0.75) + proximity bonus (2.0) − novelty penalty.
 - **Opt-in contract for whole-feed rollout**: any adapter that sets
-  `categories: [...]` (canonical slugs) on its NormalizedContent items joins
-  the algorithm. Sources without categories are untouched. To roll out a
-  source: add a mapping from its native taxonomy to the canonical slugs.
+  `topics: [...]` (fine-grained tags via `AffinityManager.cleanTopics`) on its
+  NormalizedContent items joins the algorithm. Sources without topics are
+  untouched. No mapping table needed — see Taxonomy v2.
 - **Signal plumbing**: dwell observers in app.js / redesign-app.js
   (60% threshold, enter/exit timing, pagehide flush); saves recorded inside
   `LikesManager.toggle` (covers both UIs, heart buttons and double-tap);
@@ -64,6 +68,48 @@ of 4; quality-class category names have inconsistent casing per WikiProject
 **Done when** (from the brief): affinity visibly shifts within ~20
 interactions; feed doesn't collapse to one topic; works offline after first
 load (pool is cached; extracts are not — offline shows other cached sources).
+
+## Taxonomy v2 — open fine-grained tags (2026-07-23)
+
+Replaced the fixed six-category vector (the user's words: "very dumb"). Three
+problems it had: too coarse (Metaphysics, Logic, Aesthetics all collapsed to
+"philosophy"), closed (chemistry/history had nowhere to go), and manual (every
+source needed a hand-written mapping table onto the six).
+
+New model — **open vocabulary of fine-grained tags**:
+
+- The affinity vector is an open `tag → weight` map that grows as new topics
+  appear; no fixed list. Each item carries its OWN real categories as `topics`
+  (Wikipedia article categories via `prop=categories&clshow=!hidden`;
+  WordPress essay category names). No per-source mapping table.
+- **Fetching vs. learning decoupled**: an adapter can only *query* buckets its
+  API supports, so it biases fetches toward whichever of its buckets your tags
+  favour (`AffinityManager.chooseBucket` + `bucketScore`, backed by a
+  `bucketIndex` that records which fine tags each bucket yields) — but it
+  *tags* results with real fine topics, so learning stays granular and
+  transfers across sources wherever tags overlap.
+- **Central normalization** in `AffinityManager.cleanTopics` /
+  `_normalizeTag`: lowercase; strip `Category:`, quality-class prefixes, and
+  **leading nationality/era demonyms** (`_DEMONYMS` — so "american economists"
+  and "british economists" both aggregate as "economists"); a small `_ALIASES`
+  table for cross-source synonyms ("social and political philosophy" →
+  "political philosophy"). Junk filter (`_isJunk` + `_JUNK_PATTERNS`) drops
+  Wikipedia maintenance/date/biographical-origin/event noise.
+- **Scoring is max-pooled**: `score()` = 0.5·mean + 0.5·max of topic weights −
+  novelty + bonus, so a candidate ranks high if ANY topic is one you love — a
+  noisy article carrying one great topic among trivia tags isn't buried.
+- **Bounded**: vector pruned to `MAX_TAGS` (weakest |weight| dropped);
+  `MAX_TOPICS_PER_ITEM` caps per-item tags; per-bucket link index capped too.
+- localStorage key unchanged (`smarttok.affinity`); old six-slug profiles are
+  forward-compatible (the slugs just become six coarse tags).
+
+**Known limitation (not a tag bug):** the wikiedu *pool* is broad — WikiProject
+quality categories include biographies, historical events, even a stray
+Simpsons episode. Tags are now extracted cleanly, but some pool articles just
+aren't "survey-course concept" material. Tightening the pool (prefer
+concept articles, filter person/event pages) is a separate follow-up; the
+open-tag model plus max-pooling/decay/pruning keep the resulting noise
+self-limiting in the meantime.
 
 ## Phase 2 — more sources (only after Phase 1 ranking feels good)
 
@@ -85,15 +131,14 @@ Build order:
    built 2026-07-23, ahead of OpenStax at user request). WordPress REST API
    (`1000wordphilosophy.com/wp-json/wp/v2`), CORS-friendly, ~229 essays,
    fetched live at runtime (not a static manifest — the API is reliable and
-   the pool is small). Affinity-aware: filters to ethics/politics WP
-   categories when the profile favours them, unfiltered otherwise. Card body
-   is the essay's own text with the "Author / Categories / Word Count"
-   masthead stripped (its field order and word-count label vary essay to
-   essay — strip up through the word-count number, guarded by an
-   Author/Categories label). **Taxonomy map** (WP category → canonical slug),
-   in `WordPhilAdapter.CATEGORY_MAP`: Ethics / bioethics / Race / Sex & Gender
-   → `ethics`; Social & Political / Philosophy of Law → `politics`; everything
-   else → `philosophy`. CC BY-NC — satisfied by SmartTok being personal &
+   the pool is small). Card body is the essay's own text with the
+   "Author / Categories / Word Count" masthead stripped (its field order and
+   word-count label vary essay to essay — strip up through the word-count
+   number, guarded by an Author/Categories label). **Taxonomy (v2, open
+   tags):** no mapping table — each essay is tagged with its real WordPress
+   category names (fetched once, cached 7 days), normalized via
+   `AffinityManager.cleanTopics`. Fetch bias uses `chooseBucket` over the WP
+   categories. CC BY-NC — satisfied by SmartTok being personal &
    non-commercial; attribution preserved via source label + openLink.
 3. **LibreTexts** — fills gaps; licensing varies per text, check individually.
 4. **SEP** — summary sections only, link out for the rest. Reuse terms are
