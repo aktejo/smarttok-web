@@ -66,7 +66,14 @@
       "Bash(git tag *)",
       "Bash(git show *)",
       "Bash(git merge --no-ff edu-depth-feed -m ' *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(curl -s --max-time 20 -H 'User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)' -D - -o /tmp/os_books.json 'https://openstax.org/apps/cms/api/v2/pages/?type=books.Book&fields=title,slug&limit=5')",
+      "Bash(curl -s --max-time 20 -H 'User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)' 'https://openstax.org/apps/cms/api/v2/pages/?type=books.Book&slug=american-government-3e&fields=title,cnx_id,slug' -o /tmp/os_ag.json)",
+      "Bash(curl -s --max-time 20 -H 'User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)' -H 'Origin: https://smarttok-web-6.vercel.app' -D - -o /dev/null 'https://openstax.org/apps/cms/api/v2/pages/?type=books.Book&limit=1')",
+      "Bash(curl -s --max-time 20 -H 'User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)' -H 'Origin: https://smarttok-web-6.vercel.app' -D - -o /tmp/twp.json 'https://1000wordphilosophy.com/wp-json/wp/v2/posts?per_page=3&_fields=id,link,title,excerpt,categories')",
+      "Bash(curl -s --max-time 20 -H 'User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)' 'https://1000wordphilosophy.com/wp-json/wp/v2/categories?per_page=100&_fields=id,name,count&orderby=count&order=desc' -o /tmp/twpcats.json)",
+      "Bash(curl -s --max-time 20 -H 'User-Agent: SmartTokEduFeed/1.0 \\(https://smarttok-web-6.vercel.app\\)' -D /tmp/twp_hdr.txt 'https://1000wordphilosophy.com/wp-json/wp/v2/posts?per_page=2&offset=40&categories=8289&_fields=id,link,title,excerpt,categories,jetpack_featured_media_url,featured_media' -o /tmp/twp2.json)",
+      "Bash(git merge --no-ff edu-feed-wordphil -m ' *)"
     ]
   }
 }
